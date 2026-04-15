@@ -11,7 +11,7 @@ class AccountHeroCard extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.all(20.w),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           colors: [AppColors.dark, AppColors.primary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,

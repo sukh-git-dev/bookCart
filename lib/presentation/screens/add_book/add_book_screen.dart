@@ -1,4 +1,5 @@
 import 'package:bookcart/core/constants/app_colors.dart';
+import 'package:bookcart/core/constants/book_categories.dart';
 import 'package:bookcart/core/constants/app_strings.dart';
 import 'package:bookcart/logic/cubits/book_cubit.dart';
 import 'package:bookcart/logic/cubits/book_state.dart';
@@ -63,7 +64,8 @@ class _AddBookScreenState extends State<AddBookScreen> {
 
   void _showFeedback(BuildContext context, String message) {
     final lowerMessage = message.toLowerCase();
-    final isSuccess = lowerMessage.contains('published') ||
+    final isSuccess =
+        lowerMessage.contains('published') ||
         lowerMessage.contains('success') ||
         lowerMessage.contains('ready');
 
@@ -320,6 +322,11 @@ class _AddBookFormCard extends StatelessWidget {
             onChanged: cubit.updateAuthor,
           ),
           SizedBox(height: 14.h),
+          _CategorySelectorSection(
+            selectedCategories: state.draft.categories,
+            onToggleCategory: cubit.toggleCategory,
+          ),
+          SizedBox(height: 14.h),
           AppTextField(
             controller: priceController,
             label: 'Selling Price',
@@ -356,7 +363,8 @@ class _AddBookFormCard extends StatelessWidget {
                 ),
                 const StepRow(
                   step: '2',
-                  text: 'Add title, author, price, and description.',
+                  text:
+                      'Add title, author, price, description, and categories.',
                 ),
                 const StepRow(step: '3', text: 'Review all listing details.'),
                 const StepRow(step: '4', text: 'Check listing preview.'),
@@ -415,6 +423,16 @@ class _AddBookFormCard extends StatelessWidget {
                           fontSize: 12.sp,
                         ),
                       ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        state.draft.categories.isEmpty
+                            ? 'Categories are optional for this listing'
+                            : 'Categories: ${state.draft.categoryLabel}',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.78),
+                          fontSize: 12.sp,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -429,10 +447,7 @@ class _AddBookFormCard extends StatelessWidget {
               icon: const Icon(Icons.cloud_upload_rounded),
               label: Text(
                 state.isPublishing ? 'Publishing...' : 'Publish Listing',
-                style: TextStyle(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w700,
-                ),
+                style: TextStyle(fontSize: 16.sp, fontWeight: FontWeight.w700),
               ),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
@@ -450,6 +465,150 @@ class _AddBookFormCard extends StatelessWidget {
   }
 }
 
+class _CategorySelectorSection extends StatelessWidget {
+  const _CategorySelectorSection({
+    required this.selectedCategories,
+    required this.onToggleCategory,
+  });
+
+  final List<String> selectedCategories;
+  final ValueChanged<String> onToggleCategory;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24.r),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Categories',
+                  style: TextStyle(
+                    fontSize: 15.sp,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.dark,
+                  ),
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 7.h),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(16.r),
+                ),
+                child: Text(
+                  selectedCategories.isEmpty
+                      ? 'Optional'
+                      : '${selectedCategories.length} selected',
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8.h),
+          Text(
+            'Choose one or more categories for this book. Leave them blank if you want.',
+            style: TextStyle(
+              fontSize: 13.sp,
+              height: 1.45,
+              color: AppColors.muted,
+            ),
+          ),
+          SizedBox(height: 14.h),
+          Wrap(
+            spacing: 10.w,
+            runSpacing: 10.h,
+            children: [
+              for (final category in kBookCategories)
+                _CategoryChip(
+                  label: category,
+                  isSelected: selectedCategories.contains(category),
+                  onTap: () => onToggleCategory(category),
+                ),
+            ],
+          ),
+          if (selectedCategories.isNotEmpty) ...[
+            SizedBox(height: 14.h),
+            Text(
+              'Selected: ${selectedCategories.join(', ')}',
+              style: TextStyle(
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w700,
+                color: AppColors.dark,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryChip extends StatelessWidget {
+  const _CategoryChip({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(18.r),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 11.h),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : AppColors.white,
+          borderRadius: BorderRadius.circular(18.r),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.border,
+          ),
+        ),
+        child: Wrap(
+          spacing: 8.w,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Icon(
+              isSelected
+                  ? Icons.check_circle_rounded
+                  : Icons.add_circle_outline_rounded,
+              size: 16.sp,
+              color: isSelected ? Colors.white : AppColors.primary,
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w700,
+                color: isSelected ? Colors.white : AppColors.dark,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _HeroSellCard extends StatelessWidget {
   const _HeroSellCard({required this.state});
 
@@ -461,7 +620,7 @@ class _HeroSellCard extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.all(22.w),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           colors: [AppColors.dark, AppColors.primary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -578,9 +737,7 @@ class _ImagePickerCard extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(28.r),
               child: hasImage
-                  ? _SelectedImageView(
-                      imageBytes: state.draft.imageBytes!,
-                    )
+                  ? _SelectedImageView(imageBytes: state.draft.imageBytes!)
                   : const _ImagePickerPlaceholder(),
             ),
           ),

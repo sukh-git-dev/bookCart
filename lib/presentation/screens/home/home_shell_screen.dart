@@ -3,9 +3,9 @@ import 'package:bookcart/logic/cubits/book_state.dart';
 import 'package:bookcart/presentation/bottom_nav_bar.dart';
 import 'package:bookcart/presentation/screens/add_book/add_book_screen.dart';
 import 'package:bookcart/presentation/screens/cart/cart_screen.dart';
+import 'package:bookcart/presentation/screens/chat/chat_screen.dart';
 import 'package:bookcart/presentation/screens/home/home_screen.dart';
 import 'package:bookcart/presentation/screens/profile/profile_screen.dart';
-import 'package:bookcart/presentation/screens/search/search_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -21,7 +21,7 @@ class HomeShellScreen extends StatelessWidget {
       HomeScreen(),
       CartScreen(),
       AddBookScreen(),
-      SearchScreen(),
+      ChatScreen(),
       ProfileScreen(),
     ];
 

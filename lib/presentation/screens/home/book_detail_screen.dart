@@ -12,10 +12,7 @@ class BookDetailScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Book Details'),
-        centerTitle: true,
-      ),
+      appBar: AppBar(title: const Text('Book Details'), centerTitle: true),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(20.w),
         child: Center(
@@ -28,7 +25,7 @@ class BookDetailScreen extends StatelessWidget {
                   width: double.infinity,
                   padding: EdgeInsets.all(22.w),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
+                    gradient: LinearGradient(
                       colors: [AppColors.dark, AppColors.primary],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
@@ -85,10 +82,14 @@ class BookDetailScreen extends StatelessWidget {
                               spacing: 8.w,
                               runSpacing: 8.h,
                               children: [
-                                _DetailChip(
-                                  icon: Icons.category_rounded,
-                                  label: book.category,
-                                ),
+                                for (final category
+                                    in book.categories.isEmpty
+                                        ? [book.categoryLabel]
+                                        : book.categories)
+                                  _DetailChip(
+                                    icon: Icons.category_rounded,
+                                    label: category,
+                                  ),
                                 const _DetailChip(
                                   icon: Icons.location_on_rounded,
                                   label: '12 km away',
@@ -185,8 +186,10 @@ class BookDetailScreen extends StatelessWidget {
                             SizedBox(height: 10.h),
                             _DetailInfoRow(
                               icon: Icons.menu_book_rounded,
-                              label: 'Category',
-                              value: book.category,
+                              label: book.categories.length > 1
+                                  ? 'Categories'
+                                  : 'Category',
+                              value: book.categoryLabel,
                             ),
                           ],
                         ),

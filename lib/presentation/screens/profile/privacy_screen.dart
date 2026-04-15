@@ -44,25 +44,25 @@ class PrivacyScreen extends StatelessWidget {
                   const PolicyCard(
                     title: 'Account Data',
                     body:
-                        'Your name, phone number, email, and location are stored locally on this device for account access and profile display.',
+                        'Your name, phone number, email, and location are stored in Firebase Authentication and Cloud Firestore for account access and profile display.',
                   ),
                   SizedBox(height: 12.h),
                   const PolicyCard(
                     title: 'Images',
                     body:
-                        'Profile images and book images are used only inside the app experience and saved on-device as part of local account and listing data.',
+                        'Profile images selected during signup or account updates are saved with your account profile data for use inside the app experience.',
                   ),
                   SizedBox(height: 12.h),
                   const PolicyCard(
                     title: 'Chats And Listings',
                     body:
-                        'Chats, listings, and account actions are shown in the app UI. Any future backend connection should use secure transfer and storage.',
+                        'Chats and listings are shown in the app UI, while authenticated account actions use Firebase-backed storage and identity services.',
                   ),
                   SizedBox(height: 12.h),
                   const PolicyCard(
                     title: 'User Control',
                     body:
-                        'You can update your account details, logout from the current session, or delete the saved local account from the account screen.',
+                        'You can update your account details, logout from the current session, or delete your Firebase-backed account from the account screen.',
                   ),
                 ],
               ),

@@ -1,3 +1,4 @@
+import 'package:bookcart/data/models/book_model.dart';
 import 'package:bookcart/data/repository/book_repository.dart';
 import 'package:bookcart/logic/cubits/book_state.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -33,7 +34,9 @@ class BookCubit extends Cubit<BookState> {
         ),
       );
     } catch (_) {
-      emit(state.copyWith(message: 'Could not read the image. Please try again.'));
+      emit(
+        state.copyWith(message: 'Could not read the image. Please try again.'),
+      );
     }
   }
 
@@ -46,6 +49,28 @@ class BookCubit extends Cubit<BookState> {
   void updateAuthor(String value) {
     emit(
       state.copyWith(draft: state.draft.copyWith(author: value), message: null),
+    );
+  }
+
+  void toggleCategory(String value) {
+    final selectedCategories = [...state.draft.categories];
+    final selectedIndex = selectedCategories.indexWhere(
+      (category) => category.toLowerCase() == value.toLowerCase(),
+    );
+
+    if (selectedIndex >= 0) {
+      selectedCategories.removeAt(selectedIndex);
+    } else {
+      selectedCategories.add(value);
+    }
+
+    emit(
+      state.copyWith(
+        draft: state.draft.copyWith(
+          category: BookModel.serializeCategories(selectedCategories),
+        ),
+        message: null,
+      ),
     );
   }
 

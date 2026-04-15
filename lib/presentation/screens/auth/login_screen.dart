@@ -1,5 +1,6 @@
 import 'package:bookcart/core/constants/app_colors.dart';
-import 'package:bookcart/data/repository/auth_repository.dart';
+import 'package:bookcart/logic/cubits/auth_cubit.dart';
+import 'package:bookcart/logic/cubits/auth_state.dart';
 import 'package:bookcart/presentation/screens/auth/signup_screen.dart';
 import 'package:bookcart/presentation/screens/home/home_shell_screen.dart';
 import 'package:bookcart/presentation/widgets/app_toast.dart';
@@ -17,146 +18,161 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final TextEditingController _phoneController = TextEditingController();
+  final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  bool _isSubmitting = false;
 
   @override
   void dispose() {
-    _phoneController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
 
   Future<void> _login() async {
-    if (_isSubmitting) {
-      return;
-    }
-
-    FocusScope.of(context).unfocus();
-    setState(() {
-      _isSubmitting = true;
-    });
-
-    final user = await context.read<AuthRepository>().login(
-      phone: _phoneController.text,
-      password: _passwordController.text,
-    );
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _isSubmitting = false;
-    });
-
-    if (user == null) {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text;
+    if (email.isEmpty || password.isEmpty) {
       AppToast.show(
         context,
-        message: 'Invalid login or no local account found.',
+        message: 'Enter your email and password to continue.',
         type: AppToastType.error,
       );
       return;
     }
 
-    Navigator.of(context).pushReplacementNamed(HomeShellScreen.routeName);
+    FocusScope.of(context).unfocus();
+    await context.read<AuthCubit>().login(email: email, password: password);
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            final isWide = constraints.maxWidth >= 1000;
-            final form = _AuthCard(
-              title: 'Login',
-              subtitle:
-                  'Continue with your phone number and password in the same BookCart style.',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _AuthTextField(
-                    controller: _phoneController,
-                    label: 'Phone Number',
-                    hint: 'Enter mobile number',
-                    icon: Icons.call_rounded,
-                    keyboardType: TextInputType.phone,
-                  ),
-                  SizedBox(height: 14.h),
-                  _AuthTextField(
-                    controller: _passwordController,
-                    label: 'Password',
-                    hint: 'Enter password',
-                    icon: Icons.lock_rounded,
-                    obscureText: true,
-                  ),
-                  SizedBox(height: 22.h),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton(
-                      onPressed: _isSubmitting ? null : _login,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        minimumSize: Size(double.infinity, 50.h),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20.r),
-                        ),
-                      ),
-                      child: Text(
-                        _isSubmitting ? 'Logging in...' : 'Login',
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 14.h),
-                  Center(
-                    child: TextButton(
-                      onPressed: () {
-                        Navigator.of(context).pushNamed(SignUpScreen.routeName);
-                      },
-                      child: const Text('Create new account'),
-                    ),
-                  ),
-                ],
-              ),
-            );
+    return BlocListener<AuthCubit, AuthState>(
+      listenWhen: (previous, current) =>
+          previous.status != current.status ||
+          previous.errorMessage != current.errorMessage,
+      listener: (context, state) {
+        if (state.errorMessage != null) {
+          AppToast.show(
+            context,
+            message: state.errorMessage!,
+            type: AppToastType.error,
+          );
+          context.read<AuthCubit>().clearFeedback();
+          return;
+        }
 
-            return isWide
-                ? Row(
-                    children: [
-                      const Expanded(child: _AuthHeroPanel()),
-                      Expanded(
-                        child: Center(
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.all(32),
-                            child: ConstrainedBox(
-                              constraints: const BoxConstraints(maxWidth: 460),
-                              child: form,
+        if (state.status == AuthStatus.authenticated) {
+          Navigator.of(context).pushNamedAndRemoveUntil(
+            HomeShellScreen.routeName,
+            (route) => false,
+          );
+        }
+      },
+      child: Builder(
+        builder: (context) {
+          final authState = context.watch<AuthCubit>().state;
+          final isSubmitting =
+              authState.isSubmitting && authState.action == AuthAction.login;
+
+          return Scaffold(
+            backgroundColor: AppColors.background,
+            body: SafeArea(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final isWide = constraints.maxWidth >= 1000;
+                  final form = _AuthCard(
+                    title: 'Login',
+                    subtitle:
+                        'Continue with your email address and password in the same BookCart style.',
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _AuthTextField(
+                          controller: _emailController,
+                          label: 'Email',
+                          hint: 'Enter email address',
+                          icon: Icons.mail_rounded,
+                          keyboardType: TextInputType.emailAddress,
+                        ),
+                        SizedBox(height: 14.h),
+                        _AuthTextField(
+                          controller: _passwordController,
+                          label: 'Password',
+                          hint: 'Enter password',
+                          icon: Icons.lock_rounded,
+                          obscureText: true,
+                        ),
+                        SizedBox(height: 22.h),
+                        SizedBox(
+                          width: double.infinity,
+                          child: FilledButton(
+                            onPressed: isSubmitting ? null : _login,
+                            style: FilledButton.styleFrom(
+                              backgroundColor: AppColors.primary,
+                              foregroundColor: Colors.white,
+                              minimumSize: Size(double.infinity, 50.h),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20.r),
+                              ),
+                            ),
+                            child: Text(
+                              isSubmitting ? 'Logging in...' : 'Login',
+                              style: TextStyle(
+                                fontSize: 16.sp,
+                                fontWeight: FontWeight.w700,
+                              ),
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  )
-                : SingleChildScrollView(
-                    padding: EdgeInsets.all(20.w),
-                    child: Column(
-                      children: [
-                        const _AuthHeroPanel(isCompact: true),
-                        SizedBox(height: 20.h),
-                        form,
+                        SizedBox(height: 14.h),
+                        Center(
+                          child: TextButton(
+                            onPressed: () {
+                              Navigator.of(
+                                context,
+                              ).pushNamed(SignUpScreen.routeName);
+                            },
+                            child: const Text('Create new account'),
+                          ),
+                        ),
                       ],
                     ),
                   );
-          },
-        ),
+
+                  return isWide
+                      ? Row(
+                          children: [
+                            const Expanded(child: _AuthHeroPanel()),
+                            Expanded(
+                              child: Center(
+                                child: SingleChildScrollView(
+                                  padding: const EdgeInsets.all(32),
+                                  child: ConstrainedBox(
+                                    constraints: const BoxConstraints(
+                                      maxWidth: 460,
+                                    ),
+                                    child: form,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        )
+                      : SingleChildScrollView(
+                          padding: EdgeInsets.all(20.w),
+                          child: Column(
+                            children: [
+                              const _AuthHeroPanel(isCompact: true),
+                              SizedBox(height: 20.h),
+                              form,
+                            ],
+                          ),
+                        );
+                },
+              ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -173,7 +189,7 @@ class _AuthHeroPanel extends StatelessWidget {
       margin: isCompact ? EdgeInsets.zero : const EdgeInsets.all(24),
       padding: EdgeInsets.all(isCompact ? 22.w : 36.w),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           colors: [AppColors.dark, AppColors.primary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -211,7 +227,7 @@ class _AuthHeroPanel extends StatelessWidget {
           ),
           SizedBox(height: 12.h),
           Text(
-            'Use your phone number and password to access your BookCart account securely.',
+            'Use your email address and password to access your BookCart account securely.',
             style: TextStyle(
               color: Colors.white.withValues(alpha: 0.82),
               fontSize: 14.sp,
@@ -314,27 +330,23 @@ class _AuthTextField extends StatelessWidget {
           obscureText: obscureText,
           keyboardType: keyboardType,
           style: TextStyle(color: AppColors.dark, fontSize: 14.sp),
-          decoration: InputDecoration(
-            hintText: hint,
-            prefixIcon: Icon(icon),
-          ).applyDefaults(Theme.of(context).inputDecorationTheme).copyWith(
-            fillColor: AppColors.surface,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20.r),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20.r),
-              borderSide: const BorderSide(color: AppColors.border),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20.r),
-              borderSide: const BorderSide(
-                color: AppColors.primary,
-                width: 1.4,
+          decoration: InputDecoration(hintText: hint, prefixIcon: Icon(icon))
+              .applyDefaults(Theme.of(context).inputDecorationTheme)
+              .copyWith(
+                fillColor: AppColors.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20.r),
+                  borderSide: BorderSide.none,
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20.r),
+                  borderSide: BorderSide(color: AppColors.border),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(20.r),
+                  borderSide: BorderSide(color: AppColors.primary, width: 1.4),
+                ),
               ),
-            ),
-          ),
         ),
       ],
     );

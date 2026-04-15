@@ -1,4 +1,5 @@
 import 'package:bookcart/core/constants/app_colors.dart';
+import 'package:bookcart/core/constants/book_categories.dart';
 import 'package:bookcart/data/models/book_model.dart';
 import 'package:bookcart/data/models/category_model.dart';
 import 'package:bookcart/logic/cubits/book_cubit.dart';
@@ -22,19 +23,10 @@ class _HomeScreenState extends State<HomeScreen> {
   String selectedCategory = 'All';
   late final TextEditingController _searchController;
 
-  final List<CategoryModel> categories = const [
-    CategoryModel(id: '1', name: 'School'),
-    CategoryModel(id: '2', name: 'College'),
-    CategoryModel(id: '3', name: 'Competitive Exams'),
-    CategoryModel(id: '4', name: 'Technology'),
-    CategoryModel(id: '5', name: 'Story Books'),
-    CategoryModel(id: '6', name: 'Novels'),
-    CategoryModel(id: '7', name: 'Comics'),
-    CategoryModel(id: '8', name: 'Biography'),
-    CategoryModel(id: '9', name: 'Self Help'),
-    CategoryModel(id: '10', name: 'Religious Books'),
-    CategoryModel(id: '11', name: 'Kids Books'),
-  ];
+  final List<CategoryModel> categories = List.generate(
+    kBookCategories.length,
+    (index) => CategoryModel(id: '${index + 1}', name: kBookCategories[index]),
+  );
 
   @override
   void initState() {
@@ -58,10 +50,11 @@ class _HomeScreenState extends State<HomeScreen> {
               query.isEmpty ||
               book.title.toLowerCase().contains(query) ||
               book.author.toLowerCase().contains(query) ||
-              book.category.toLowerCase().contains(query) ||
+              book.categoryLabel.toLowerCase().contains(query) ||
               book.description.toLowerCase().contains(query);
           final matchesCategory =
-              selectedCategory == 'All' || book.category == selectedCategory;
+              selectedCategory == 'All' ||
+              book.belongsToCategory(selectedCategory);
           return matchesSearch && matchesCategory;
         }).toList();
 
@@ -146,7 +139,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         borderRadius: BorderRadius.circular(
                                           22.r,
                                         ),
-                                        borderSide: const BorderSide(
+                                        borderSide: BorderSide(
                                           color: AppColors.border,
                                         ),
                                       ),
@@ -154,7 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         borderRadius: BorderRadius.circular(
                                           22.r,
                                         ),
-                                        borderSide: const BorderSide(
+                                        borderSide: BorderSide(
                                           color: AppColors.primary,
                                           width: 1.4,
                                         ),
@@ -181,7 +174,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         'assets/actions/filter.svg',
                                         width: 22.sp,
                                         height: 22.sp,
-                                        colorFilter: const ColorFilter.mode(
+                                        colorFilter: ColorFilter.mode(
                                           AppColors.primary,
                                           BlendMode.srcIn,
                                         ),
@@ -354,8 +347,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                       : AppColors.white,
                                   borderRadius: BorderRadius.circular(18.r),
                                   border: Border.all(
-                                    color:
-                                        tempSelectedCategory == category.name
+                                    color: tempSelectedCategory == category.name
                                         ? AppColors.primary
                                         : AppColors.border,
                                   ),
@@ -541,7 +533,7 @@ class _HomeHeroCard extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.all(20.w),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           colors: [AppColors.dark, AppColors.primary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -621,9 +613,9 @@ class _BookCard extends StatelessWidget {
   final BookModel book;
 
   void _openDetail(BuildContext context) {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => BookDetailScreen(book: book)),
-    );
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => BookDetailScreen(book: book)));
   }
 
   @override
@@ -680,7 +672,10 @@ class _BookCard extends StatelessWidget {
                         ),
                       ),
                       SizedBox(width: 10.w),
-                      _MetaBadge(icon: Icons.location_on_rounded, label: '12 km'),
+                      _MetaBadge(
+                        icon: Icons.location_on_rounded,
+                        label: '12 km',
+                      ),
                     ],
                   ),
                   SizedBox(height: 8.h),
@@ -690,9 +685,17 @@ class _BookCard extends StatelessWidget {
                     children: [
                       _MetaBadge(
                         icon: Icons.category_rounded,
-                        label: book.category,
+                        label: book.primaryCategory,
                       ),
-                      _MetaBadge(icon: Icons.person_rounded, label: book.author),
+                      if (book.additionalCategoryCount > 0)
+                        _MetaBadge(
+                          icon: Icons.layers_rounded,
+                          label: '+${book.additionalCategoryCount} more',
+                        ),
+                      _MetaBadge(
+                        icon: Icons.person_rounded,
+                        label: book.author,
+                      ),
                     ],
                   ),
                   SizedBox(height: 10.h),

@@ -63,7 +63,7 @@ class AboutScreen extends StatelessWidget {
                   const PolicyCard(
                     title: 'Core Features',
                     body:
-                        'The app includes local login and sign up, home search and category filter, sell form, my books management, chat UI, and account editing.',
+                        'The app includes Firebase login and sign up, home search and category filter, sell form, my books management, chat UI, and account editing.',
                   ),
                   SizedBox(height: 12.h),
                   const PolicyCard(

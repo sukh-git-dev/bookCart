@@ -113,7 +113,7 @@ class SearchScreen extends StatelessWidget {
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(22.r),
-                        borderSide: const BorderSide(color: AppColors.border),
+                        borderSide: BorderSide(color: AppColors.border),
                       ),
                     ),
                   ),
@@ -348,8 +348,12 @@ class _ChatDetailScreen extends StatelessWidget {
                       borderRadius: BorderRadius.only(
                         topLeft: Radius.circular(20.r),
                         topRight: Radius.circular(20.r),
-                        bottomLeft: Radius.circular(message.isMine ? 20.r : 6.r),
-                        bottomRight: Radius.circular(message.isMine ? 6.r : 20.r),
+                        bottomLeft: Radius.circular(
+                          message.isMine ? 20.r : 6.r,
+                        ),
+                        bottomRight: Radius.circular(
+                          message.isMine ? 6.r : 20.r,
+                        ),
                       ),
                       boxShadow: [
                         BoxShadow(
@@ -376,7 +380,7 @@ class _ChatDetailScreen extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 20.h),
             decoration: BoxDecoration(
               color: Colors.white,
-              border: const Border(top: BorderSide(color: AppColors.border)),
+              border: Border(top: BorderSide(color: AppColors.border)),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: 0.03),
@@ -408,7 +412,7 @@ class _ChatDetailScreen extends StatelessWidget {
                 Container(
                   width: 52.w,
                   height: 52.w,
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
@@ -439,7 +443,7 @@ class _ChatHeroCard extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.all(20.w),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           colors: [AppColors.dark, AppColors.primary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -645,7 +649,7 @@ class _ChatTile extends StatelessWidget {
                     width: 28.w,
                     height: 28.w,
                     alignment: Alignment.center,
-                    decoration: const BoxDecoration(
+                    decoration: BoxDecoration(
                       color: AppColors.primary,
                       shape: BoxShape.circle,
                     ),
@@ -715,10 +719,7 @@ class _ChatStatCard extends StatelessWidget {
                 SizedBox(height: 2.h),
                 Text(
                   label,
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    color: AppColors.muted,
-                  ),
+                  style: TextStyle(fontSize: 12.sp, color: AppColors.muted),
                 ),
               ],
             ),

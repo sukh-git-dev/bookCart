@@ -39,7 +39,7 @@ class _CartScreenState extends State<CartScreen> {
           return query.isEmpty ||
               book.title.toLowerCase().contains(query) ||
               book.author.toLowerCase().contains(query) ||
-              book.category.toLowerCase().contains(query) ||
+              book.categoryLabel.toLowerCase().contains(query) ||
               book.description.toLowerCase().contains(query);
         }).toList();
 
@@ -89,13 +89,11 @@ class _CartScreenState extends State<CartScreen> {
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(22.r),
-                            borderSide: const BorderSide(
-                              color: AppColors.border,
-                            ),
+                            borderSide: BorderSide(color: AppColors.border),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(22.r),
-                            borderSide: const BorderSide(
+                            borderSide: BorderSide(
                               color: AppColors.primary,
                               width: 1.4,
                             ),
@@ -171,7 +169,7 @@ class _MyBooksHero extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.all(20.w),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           colors: [AppColors.dark, AppColors.primary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -301,7 +299,7 @@ class _MyBookCard extends StatelessWidget {
                 ),
                 SizedBox(height: 4.h),
                 Text(
-                  'Category: ${book.category}',
+                  'Categories: ${book.categoryLabel}',
                   style: TextStyle(fontSize: 13.sp, color: AppColors.muted),
                 ),
                 SizedBox(height: 8.h),
@@ -342,7 +340,7 @@ class _MyBookCard extends StatelessWidget {
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.dark,
                           minimumSize: Size(double.infinity, 50.h),
-                          side: const BorderSide(color: AppColors.border),
+                          side: BorderSide(color: AppColors.border),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16.r),
                           ),
