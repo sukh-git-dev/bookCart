@@ -1,16 +1,19 @@
 import 'package:bookcart/core/constants/app_colors.dart';
+import 'package:bookcart/core/theme/app_color_palette.dart';
 import 'package:flutter/material.dart';
 
 class AppTheme {
-  static ThemeData light() {
+  static ThemeData light([AppColorPalette? palette]) {
+    final colors = palette ?? AppColors.palette;
+
     return ThemeData(
       colorScheme: ColorScheme.fromSeed(
-        seedColor: AppColors.primary,
-        primary: AppColors.primary,
-        secondary: AppColors.secondary,
-        surface: AppColors.surface,
+        seedColor: colors.primary,
+        primary: colors.primary,
+        secondary: colors.secondary,
+        surface: colors.surface,
       ),
-      scaffoldBackgroundColor: AppColors.background,
+      scaffoldBackgroundColor: colors.background,
       useMaterial3: true,
       fontFamily: 'Roboto',
       filledButtonTheme: FilledButtonThemeData(
@@ -31,14 +34,14 @@ class AppTheme {
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.surface,
-        hintStyle: const TextStyle(
-          color: AppColors.muted,
+        fillColor: colors.surface,
+        hintStyle: TextStyle(
+          color: colors.muted,
           fontSize: 14,
           fontWeight: FontWeight.w500,
         ),
-        prefixIconColor: AppColors.primary,
-        suffixIconColor: AppColors.muted,
+        prefixIconColor: colors.primary,
+        suffixIconColor: colors.muted,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 18,
           vertical: 16,
@@ -49,20 +52,17 @@ class AppTheme {
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: colors.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
-          borderSide: const BorderSide(
-            color: AppColors.primary,
-            width: 1.4,
-          ),
+          borderSide: BorderSide(color: colors.primary, width: 1.4),
         ),
       ),
-      textSelectionTheme: const TextSelectionThemeData(
-        cursorColor: AppColors.primary,
-        selectionColor: AppColors.secondary,
-        selectionHandleColor: AppColors.primary,
+      textSelectionTheme: TextSelectionThemeData(
+        cursorColor: colors.primary,
+        selectionColor: colors.secondary,
+        selectionHandleColor: colors.primary,
       ),
     );
   }

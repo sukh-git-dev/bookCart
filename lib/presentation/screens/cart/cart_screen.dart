@@ -2,6 +2,9 @@ import 'package:bookcart/core/constants/app_colors.dart';
 import 'package:bookcart/data/models/book_model.dart';
 import 'package:bookcart/logic/cubits/book_cubit.dart';
 import 'package:bookcart/logic/cubits/book_state.dart';
+import 'package:bookcart/presentation/screens/home/book_detail_screen.dart';
+import 'package:bookcart/presentation/widgets/app_shimmer.dart';
+import 'package:bookcart/presentation/widgets/app_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -32,14 +35,33 @@ class _CartScreenState extends State<CartScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocBuilder<BookCubit, BookState>(
+    return BlocConsumer<BookCubit, BookState>(
+      listenWhen: (previous, current) => previous.message != current.message,
+      listener: (context, state) {
+        if (state.message == null || state.message!.isEmpty) {
+          return;
+        }
+
+        final lower = state.message!.toLowerCase();
+        final isSuccess =
+            lower.contains('success') ||
+            lower.contains('updated') ||
+            lower.contains('deleted');
+
+        AppToast.show(
+          context,
+          message: state.message!,
+          type: isSuccess ? AppToastType.success : AppToastType.error,
+        );
+        context.read<BookCubit>().clearMessage();
+      },
       builder: (context, state) {
         final filteredBooks = state.books.where((book) {
           final query = searchQuery.trim().toLowerCase();
           return query.isEmpty ||
               book.title.toLowerCase().contains(query) ||
               book.author.toLowerCase().contains(query) ||
-              book.category.toLowerCase().contains(query) ||
+              book.categoryLabel.toLowerCase().contains(query) ||
               book.description.toLowerCase().contains(query);
         }).toList();
 
@@ -89,13 +111,11 @@ class _CartScreenState extends State<CartScreen> {
                           ),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(22.r),
-                            borderSide: const BorderSide(
-                              color: AppColors.border,
-                            ),
+                            borderSide: BorderSide(color: AppColors.border),
                           ),
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(22.r),
-                            borderSide: const BorderSide(
+                            borderSide: BorderSide(
                               color: AppColors.primary,
                               width: 1.4,
                             ),
@@ -103,7 +123,9 @@ class _CartScreenState extends State<CartScreen> {
                         ),
                       ),
                       SizedBox(height: 22.h),
-                      if (filteredBooks.isEmpty)
+                      if (state.isLoadingBooks)
+                        const _CartLoadingSection()
+                      else if (filteredBooks.isEmpty)
                         Container(
                           width: double.infinity,
                           padding: EdgeInsets.all(28.w),
@@ -171,7 +193,7 @@ class _MyBooksHero extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.all(20.w),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           colors: [AppColors.dark, AppColors.primary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -252,6 +274,8 @@ class _MyBookCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final cubit = context.read<BookCubit>();
+
     return Container(
       padding: EdgeInsets.all(18.w),
       decoration: BoxDecoration(
@@ -301,7 +325,7 @@ class _MyBookCard extends StatelessWidget {
                 ),
                 SizedBox(height: 4.h),
                 Text(
-                  'Category: ${book.category}',
+                  'Categories: ${book.categoryLabel}',
                   style: TextStyle(fontSize: 13.sp, color: AppColors.muted),
                 ),
                 SizedBox(height: 8.h),
@@ -330,19 +354,18 @@ class _MyBookCard extends StatelessWidget {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () {
-                          _showBookActionDialog(
-                            context,
-                            title: 'Edit Book',
-                            message:
-                                'Edit option for "${book.title}" can be connected here.',
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => BookDetailScreen(book: book),
+                            ),
                           );
                         },
-                        icon: const Icon(Icons.edit_rounded),
-                        label: const Text('Edit'),
+                        icon: const Icon(Icons.visibility_rounded),
+                        label: const Text('View'),
                         style: OutlinedButton.styleFrom(
                           foregroundColor: AppColors.dark,
                           minimumSize: Size(double.infinity, 50.h),
-                          side: const BorderSide(color: AppColors.border),
+                          side: BorderSide(color: AppColors.border),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16.r),
                           ),
@@ -351,29 +374,14 @@ class _MyBookCard extends StatelessWidget {
                     ),
                     SizedBox(width: 10.w),
                     Expanded(
-                      child: FilledButton.icon(
-                        onPressed: () {
-                          _showBookActionDialog(
-                            context,
-                            title: 'Delete Book',
-                            message:
-                                'Delete option for "${book.title}" can be connected here.',
-                          );
-                        },
-                        icon: SvgPicture.asset(
-                          'assets/actions/delete.svg',
-                          width: 18.sp,
-                          height: 18.sp,
-                          colorFilter: const ColorFilter.mode(
-                            Colors.white,
-                            BlendMode.srcIn,
-                          ),
-                        ),
-                        label: const Text('Delete'),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: const Color(0xFFB8403F),
-                          foregroundColor: Colors.white,
+                      child: OutlinedButton.icon(
+                        onPressed: () => cubit.startEditBook(book.id),
+                        icon: const Icon(Icons.edit_rounded),
+                        label: const Text('Edit'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
                           minimumSize: Size(double.infinity, 50.h),
+                          side: BorderSide(color: AppColors.border),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(16.r),
                           ),
@@ -381,6 +389,40 @@ class _MyBookCard extends StatelessWidget {
                       ),
                     ),
                   ],
+                ),
+                SizedBox(height: 10.h),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: () {
+                      _showDeleteDialog(
+                        context,
+                        title: 'Delete Book',
+                        message: 'Delete "${book.title}" from your inventory?',
+                        onConfirm: () async {
+                          await cubit.deleteBook(book.id);
+                        },
+                      );
+                    },
+                    icon: SvgPicture.asset(
+                      'assets/actions/delete.svg',
+                      width: 18.sp,
+                      height: 18.sp,
+                      colorFilter: const ColorFilter.mode(
+                        Colors.white,
+                        BlendMode.srcIn,
+                      ),
+                    ),
+                    label: const Text('Delete'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: const Color(0xFFB8403F),
+                      foregroundColor: Colors.white,
+                      minimumSize: Size(double.infinity, 50.h),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16.r),
+                      ),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -391,10 +433,30 @@ class _MyBookCard extends StatelessWidget {
   }
 }
 
-void _showBookActionDialog(
+class _CartLoadingSection extends StatelessWidget {
+  const _CartLoadingSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return AppShimmer(
+      child: Column(
+        children: List.generate(
+          4,
+          (index) => Padding(
+            padding: EdgeInsets.only(bottom: 14.h),
+            child: AppShimmerBox(height: 220.h, radius: 24.r),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+void _showDeleteDialog(
   BuildContext context, {
   required String title,
   required String message,
+  required Future<void> Function() onConfirm,
 }) {
   showDialog<void>(
     context: context,
@@ -405,7 +467,17 @@ void _showBookActionDialog(
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Close'),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await onConfirm();
+            },
+            style: FilledButton.styleFrom(
+              backgroundColor: const Color(0xFFB8403F),
+            ),
+            child: const Text('Delete'),
           ),
         ],
       );

@@ -42,31 +42,31 @@ class AppTextField extends StatelessWidget {
           keyboardType: keyboardType,
           onChanged: onChanged,
           style: TextStyle(color: AppColors.dark, fontSize: 14.sp),
-          decoration: InputDecoration(
-            hintText: hint,
-            prefixIcon: Icon(prefixIcon),
-          ).applyDefaults(Theme.of(context).inputDecorationTheme).copyWith(
-            fillColor: AppColors.white,
-            contentPadding: EdgeInsets.symmetric(
-              horizontal: 18.w,
-              vertical: maxLines > 1 ? 18.h : 16.h,
-            ),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20.r),
-              borderSide: BorderSide.none,
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20.r),
-              borderSide: const BorderSide(color: AppColors.border),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(20.r),
-              borderSide: const BorderSide(
-                color: AppColors.primary,
-                width: 1.4,
-              ),
-            ),
-          ),
+          decoration:
+              InputDecoration(hintText: hint, prefixIcon: Icon(prefixIcon))
+                  .applyDefaults(Theme.of(context).inputDecorationTheme)
+                  .copyWith(
+                    fillColor: AppColors.white,
+                    contentPadding: EdgeInsets.symmetric(
+                      horizontal: 18.w,
+                      vertical: maxLines > 1 ? 18.h : 16.h,
+                    ),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20.r),
+                      borderSide: BorderSide.none,
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20.r),
+                      borderSide: BorderSide(color: AppColors.border),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(20.r),
+                      borderSide: BorderSide(
+                        color: AppColors.primary,
+                        width: 1.4,
+                      ),
+                    ),
+                  ),
         ),
       ],
     );

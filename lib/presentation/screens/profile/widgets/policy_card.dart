@@ -3,11 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class PolicyCard extends StatelessWidget {
-  const PolicyCard({
-    super.key,
-    required this.title,
-    required this.body,
-  });
+  const PolicyCard({super.key, required this.title, required this.body});
 
   final String title;
   final String body;

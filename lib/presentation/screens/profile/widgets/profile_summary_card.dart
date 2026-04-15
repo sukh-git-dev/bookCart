@@ -38,7 +38,8 @@ class ProfileSummaryCard extends StatelessWidget {
                   shape: BoxShape.circle,
                 ),
                 child: ClipOval(
-                  child: user.profileImageBase64 != null &&
+                  child:
+                      user.profileImageBase64 != null &&
                           user.profileImageBase64!.isNotEmpty
                       ? Image.memory(
                           base64Decode(user.profileImageBase64!),
@@ -67,10 +68,7 @@ class ProfileSummaryCard extends StatelessWidget {
                     SizedBox(height: 4.h),
                     Text(
                       'Book seller profile',
-                      style: TextStyle(
-                        fontSize: 13.sp,
-                        color: AppColors.muted,
-                      ),
+                      style: TextStyle(fontSize: 13.sp, color: AppColors.muted),
                     ),
                   ],
                 ),

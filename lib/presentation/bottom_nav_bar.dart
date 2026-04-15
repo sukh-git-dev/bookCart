@@ -2,6 +2,7 @@ import 'package:bookcart/core/constants/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:stylish_bottom_bar/stylish_bottom_bar.dart';
 
 class BookBottomNavBar extends StatelessWidget {
   const BookBottomNavBar({
@@ -23,11 +24,11 @@ class BookBottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final inactiveColor = const Color(0xFF7D746A);
+
     return Container(
       margin: EdgeInsets.fromLTRB(16.w, 0, 16.w, 20.h),
-      padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 10.h),
       decoration: BoxDecoration(
-        color: AppColors.white,
         borderRadius: BorderRadius.circular(28.r),
         boxShadow: [
           BoxShadow(
@@ -37,57 +38,54 @@ class BookBottomNavBar extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        children: List.generate(items.length, (index) {
-          final item = items[index];
-          final isSelected = index == currentIndex;
-          return Expanded(
-            child: InkWell(
-              borderRadius: BorderRadius.circular(20.r),
-              onTap: () => onTap(index),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                padding: EdgeInsets.symmetric(vertical: 8.h),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppColors.primary.withValues(alpha: 0.12)
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(20.r),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SvgPicture.asset(
-                      item.assetPath,
-                      width: 24.sp,
-                      height: 24.sp,
-                      colorFilter: ColorFilter.mode(
-                        isSelected
-                            ? AppColors.primary
-                            : const Color(0xFF7D746A),
-                        BlendMode.srcIn,
-                      ),
-                    ),
-                    SizedBox(height: 4.h),
-                    Text(
-                      item.label,
-                      style: TextStyle(
-                        fontSize: 11.sp,
-                        fontWeight: isSelected
-                            ? FontWeight.w700
-                            : FontWeight.w500,
-                        color: isSelected
-                            ? AppColors.primary
-                            : const Color(0xFF7D746A),
-                      ),
-                    ),
-                  ],
-                ),
+      child: StylishBottomBar(
+        currentIndex: currentIndex,
+        backgroundColor: AppColors.white,
+        elevation: 0,
+        hasNotch: false,
+        borderRadius: BorderRadius.circular(28.r),
+        option: AnimatedBarOptions(
+          barAnimation: BarAnimation.liquid,
+          iconStyle: IconStyle.animated,
+          opacity: 0.18,
+          iconSize: 24.sp,
+        ),
+        items: [
+          for (final item in items)
+            BottomBarItem(
+              icon: _NavAssetIcon(
+                assetPath: item.assetPath,
+                color: inactiveColor,
               ),
+              selectedIcon: _NavAssetIcon(
+                assetPath: item.assetPath,
+                color: AppColors.primary,
+              ),
+              title: Text(item.label),
+              backgroundColor: AppColors.primary,
+              selectedColor: AppColors.primary,
+              unSelectedColor: inactiveColor,
             ),
-          );
-        }),
+        ],
+        onTap: onTap,
       ),
+    );
+  }
+}
+
+class _NavAssetIcon extends StatelessWidget {
+  const _NavAssetIcon({required this.assetPath, required this.color});
+
+  final String assetPath;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return SvgPicture.asset(
+      assetPath,
+      width: 24.sp,
+      height: 24.sp,
+      colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
     );
   }
 }

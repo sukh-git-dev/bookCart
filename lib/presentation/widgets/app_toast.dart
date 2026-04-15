@@ -6,22 +6,57 @@ import 'package:flutter_svg/flutter_svg.dart';
 enum AppToastType { success, error }
 
 class AppToast {
+  static OverlayEntry? _currentEntry;
+
   static void show(
     BuildContext context, {
     required String message,
     required AppToastType type,
   }) {
-    ScaffoldMessenger.of(context)
-      ..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          elevation: 0,
-          behavior: SnackBarBehavior.floating,
-          backgroundColor: Colors.transparent,
-          margin: EdgeInsets.fromLTRB(16.w, 0, 16.w, 16.h),
-          content: _ToastCard(message: message, type: type),
+    _currentEntry?.remove();
+
+    final overlay = Overlay.of(context, rootOverlay: true);
+    final entry = OverlayEntry(
+      builder: (overlayContext) => _ToastOverlay(message: message, type: type),
+    );
+
+    _currentEntry = entry;
+    overlay.insert(entry);
+
+    Future<void>.delayed(const Duration(milliseconds: 2800), () {
+      if (_currentEntry == entry) {
+        entry.remove();
+        _currentEntry = null;
+      }
+    });
+  }
+}
+
+class _ToastOverlay extends StatelessWidget {
+  const _ToastOverlay({required this.message, required this.type});
+
+  final String message;
+  final AppToastType type;
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.fromLTRB(16.w, 12.h, 16.w, 0),
+          child: Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 540),
+              child: Material(
+                color: Colors.transparent,
+                child: _ToastCard(message: message, type: type),
+              ),
+            ),
+          ),
         ),
-      );
+      ),
+    );
   }
 }
 
@@ -46,9 +81,9 @@ class _ToastCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 20,
+            offset: const Offset(0, 10),
           ),
         ],
       ),

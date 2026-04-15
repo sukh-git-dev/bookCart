@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
+import 'package:bookcart/core/theme/app_color_palette.dart';
 
 class AppColors {
-  static const primary = Color(0xFF0F766E);
-  static const secondary = Color(0xFF14B8A6);
-  static const background = Color(0xFFF2FBFA);
-  static const surface = Color(0xFFDDF4F1);
-  static const dark = Color(0xFF12312E);
-  static const muted = Color(0xFF5C7C78);
-  static const border = Color(0xFFBFE5DF);
+  static AppColorPalette _palette = AppThemePalettes.forest;
+
+  static AppColorPalette get palette => _palette;
+
+  static void applyPalette(AppColorPalette palette) {
+    _palette = palette;
+  }
+
+  static Color get primary => _palette.primary;
+  static Color get secondary => _palette.secondary;
+  static Color get background => _palette.background;
+  static Color get surface => _palette.surface;
+  static Color get dark => _palette.dark;
+  static Color get muted => _palette.muted;
+  static Color get border => _palette.border;
   static const white = Colors.white;
 
   const AppColors._();

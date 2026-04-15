@@ -2,15 +2,17 @@ import 'dart:typed_data';
 
 class BookModel {
   const BookModel({
+    this.id = '',
     this.imagePath,
     this.imageBytes,
     this.title = '',
     this.author = '',
-    this.category = 'Other',
+    this.category = '',
     this.price = '',
     this.description = '',
   });
 
+  final String id;
   final String? imagePath;
   final Uint8List? imageBytes;
   final String title;
@@ -19,6 +21,25 @@ class BookModel {
   final String price;
   final String description;
 
+  List<String> get categories => parseCategories(category);
+
+  String get categoryLabel =>
+      categories.isEmpty ? 'Other' : categories.join(', ');
+
+  String get primaryCategory => categories.isEmpty ? 'Other' : categories.first;
+
+  int get additionalCategoryCount =>
+      categories.length > 1 ? categories.length - 1 : 0;
+
+  double get priceValue => double.tryParse(price.trim()) ?? 0;
+
+  bool belongsToCategory(String value) {
+    final normalizedValue = value.trim().toLowerCase();
+    return categories.any(
+      (category) => category.toLowerCase() == normalizedValue,
+    );
+  }
+
   bool get canPublish =>
       title.trim().isNotEmpty &&
       author.trim().isNotEmpty &&
@@ -26,6 +47,7 @@ class BookModel {
       description.trim().isNotEmpty;
 
   BookModel copyWith({
+    String? id,
     String? imagePath,
     Uint8List? imageBytes,
     String? title,
@@ -36,6 +58,7 @@ class BookModel {
     bool clearImagePath = false,
   }) {
     return BookModel(
+      id: id ?? this.id,
       imagePath: clearImagePath ? null : imagePath ?? this.imagePath,
       imageBytes: imageBytes ?? this.imageBytes,
       title: title ?? this.title,
@@ -44,5 +67,43 @@ class BookModel {
       price: price ?? this.price,
       description: description ?? this.description,
     );
+  }
+
+  static List<String> parseCategories(String value) {
+    final seen = <String>{};
+    final parsed = <String>[];
+
+    for (final rawCategory in value.split(',')) {
+      final trimmedCategory = rawCategory.trim();
+      if (trimmedCategory.isEmpty) {
+        continue;
+      }
+
+      final normalizedKey = trimmedCategory.toLowerCase();
+      if (seen.add(normalizedKey)) {
+        parsed.add(trimmedCategory);
+      }
+    }
+
+    return parsed;
+  }
+
+  static String serializeCategories(Iterable<String> values) {
+    final seen = <String>{};
+    final parsed = <String>[];
+
+    for (final rawCategory in values) {
+      final trimmedCategory = rawCategory.trim();
+      if (trimmedCategory.isEmpty) {
+        continue;
+      }
+
+      final normalizedKey = trimmedCategory.toLowerCase();
+      if (seen.add(normalizedKey)) {
+        parsed.add(trimmedCategory);
+      }
+    }
+
+    return parsed.join(', ');
   }
 }

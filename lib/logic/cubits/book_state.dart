@@ -5,30 +5,49 @@ class BookState {
     this.currentTabIndex = 2,
     this.books = const [],
     this.draft = const BookModel(),
-    this.isPublishing = false,
+    this.isLoadingBooks = true,
+    this.isSavingListing = false,
+    this.isProcessingImage = false,
+    this.editingBookId,
     this.message,
   });
 
   final int currentTabIndex;
   final List<BookModel> books;
   final BookModel draft;
-  final bool isPublishing;
+  final bool isLoadingBooks;
+  final bool isSavingListing;
+  final bool isProcessingImage;
+  final String? editingBookId;
   final String? message;
 
-  bool get canPublish => !isPublishing && draft.canPublish;
+  bool get isEditing => editingBookId != null;
+
+  bool get canPublish =>
+      !isLoadingBooks &&
+      !isSavingListing &&
+      !isProcessingImage &&
+      draft.canPublish;
 
   BookState copyWith({
     int? currentTabIndex,
     List<BookModel>? books,
     BookModel? draft,
-    bool? isPublishing,
+    bool? isLoadingBooks,
+    bool? isSavingListing,
+    bool? isProcessingImage,
+    String? editingBookId,
+    bool clearEditing = false,
     String? message,
   }) {
     return BookState(
       currentTabIndex: currentTabIndex ?? this.currentTabIndex,
       books: books ?? this.books,
       draft: draft ?? this.draft,
-      isPublishing: isPublishing ?? this.isPublishing,
+      isLoadingBooks: isLoadingBooks ?? this.isLoadingBooks,
+      isSavingListing: isSavingListing ?? this.isSavingListing,
+      isProcessingImage: isProcessingImage ?? this.isProcessingImage,
+      editingBookId: clearEditing ? null : editingBookId ?? this.editingBookId,
       message: message,
     );
   }

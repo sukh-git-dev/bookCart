@@ -1,12 +1,17 @@
 import 'package:bookcart/core/constants/app_colors.dart';
 import 'package:bookcart/core/constants/app_strings.dart';
+import 'package:bookcart/core/constants/book_categories.dart';
+import 'package:bookcart/data/models/book_model.dart';
 import 'package:bookcart/logic/cubits/book_cubit.dart';
 import 'package:bookcart/logic/cubits/book_state.dart';
+import 'package:bookcart/presentation/widgets/app_loading_indicator.dart';
+import 'package:bookcart/presentation/widgets/app_shimmer.dart';
 import 'package:bookcart/presentation/widgets/app_toast.dart';
 import 'package:bookcart/presentation/widgets/app_text_field.dart';
 import 'package:bookcart/presentation/widgets/info_chip.dart';
 import 'package:bookcart/presentation/widgets/section_title.dart';
 import 'package:bookcart/presentation/widgets/step_row.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -63,7 +68,8 @@ class _AddBookScreenState extends State<AddBookScreen> {
 
   void _showFeedback(BuildContext context, String message) {
     final lowerMessage = message.toLowerCase();
-    final isSuccess = lowerMessage.contains('published') ||
+    final isSuccess =
+        lowerMessage.contains('published') ||
         lowerMessage.contains('success') ||
         lowerMessage.contains('ready');
 
@@ -86,6 +92,10 @@ class _AddBookScreenState extends State<AddBookScreen> {
       },
       builder: (context, state) {
         final cubit = context.read<BookCubit>();
+        if (state.isLoadingBooks) {
+          return const _AddBookLoadingView();
+        }
+
         return LayoutBuilder(
           builder: (context, constraints) {
             final isWide = constraints.maxWidth >= 1000;
@@ -103,6 +113,8 @@ class _AddBookScreenState extends State<AddBookScreen> {
                               child: _AddBookLeadColumn(
                                 state: state,
                                 onImageTap: cubit.pickImage,
+                                onStartCreate: cubit.startCreateListing,
+                                onViewAll: cubit.viewAllListings,
                               ),
                             ),
                             SizedBox(width: 24.w),
@@ -125,6 +137,8 @@ class _AddBookScreenState extends State<AddBookScreen> {
                             _AddBookLeadColumn(
                               state: state,
                               onImageTap: cubit.pickImage,
+                              onStartCreate: cubit.startCreateListing,
+                              onViewAll: cubit.viewAllListings,
                             ),
                             SizedBox(height: 22.h),
                             _AddBookFormCard(
@@ -148,10 +162,17 @@ class _AddBookScreenState extends State<AddBookScreen> {
 }
 
 class _AddBookLeadColumn extends StatelessWidget {
-  const _AddBookLeadColumn({required this.state, required this.onImageTap});
+  const _AddBookLeadColumn({
+    required this.state,
+    required this.onImageTap,
+    required this.onStartCreate,
+    required this.onViewAll,
+  });
 
   final BookState state;
   final VoidCallback onImageTap;
+  final VoidCallback onStartCreate;
+  final VoidCallback onViewAll;
 
   @override
   Widget build(BuildContext context) {
@@ -173,19 +194,30 @@ class _AddBookLeadColumn extends StatelessWidget {
               Expanded(
                 child: _LeadStat(
                   label: 'Status',
-                  value: state.draft.imagePath == null ? 'Draft' : 'Ready',
+                  value: state.isEditing
+                      ? 'Editing'
+                      : state.draft.imagePath == null
+                      ? 'Draft'
+                      : 'Ready',
                 ),
               ),
               Container(width: 1, height: 38.h, color: AppColors.border),
               Expanded(
                 child: _LeadStat(
                   label: 'Image',
-                  value: state.draft.imagePath == null ? 'Pending' : 'Added',
+                  value: state.isProcessingImage
+                      ? 'Compressing'
+                      : state.draft.imagePath == null
+                      ? 'Pending'
+                      : 'Added',
                 ),
               ),
               Container(width: 1, height: 38.h, color: AppColors.border),
               Expanded(
-                child: _LeadStat(label: 'Steps', value: 'Manual Form'),
+                child: _LeadStat(
+                  label: 'Listings',
+                  value: '${state.books.length}',
+                ),
               ),
             ],
           ),
@@ -228,7 +260,36 @@ class _AddBookLeadColumn extends StatelessWidget {
             const Expanded(
               child: InfoChip(
                 icon: Icons.verified_rounded,
-                label: '5 taps user flow',
+                label: 'Onboarding + sell flow ready',
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 18.h),
+        _SellInsightsCard(
+          books: state.books,
+          draftPrice: state.draft.priceValue,
+        ),
+        SizedBox(height: 18.h),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: onViewAll,
+                icon: const Icon(Icons.library_books_rounded),
+                label: const Text('View All'),
+              ),
+            ),
+            SizedBox(width: 12.w),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: onStartCreate,
+                icon: Icon(
+                  state.isEditing
+                      ? Icons.add_box_rounded
+                      : Icons.refresh_rounded,
+                ),
+                label: Text(state.isEditing ? 'New Listing' : 'Reset Form'),
               ),
             ),
           ],
@@ -257,6 +318,15 @@ class _AddBookFormCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final primaryActionLabel = state.isSavingListing
+        ? (state.isEditing ? 'Updating...' : 'Publishing...')
+        : (state.isEditing ? 'Update Listing' : 'Publish Listing');
+    final primaryActionIcon = state.isSavingListing
+        ? AppLoadingIndicator(size: 18, color: Colors.white)
+        : Icon(
+            state.isEditing ? Icons.save_rounded : Icons.cloud_upload_rounded,
+          );
+
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(22.w),
@@ -284,7 +354,7 @@ class _AddBookFormCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(16.r),
                 ),
                 child: Text(
-                  'Seller Form',
+                  state.isEditing ? 'Edit Listing' : 'Seller Form',
                   style: TextStyle(
                     fontSize: 12.sp,
                     fontWeight: FontWeight.w700,
@@ -296,7 +366,9 @@ class _AddBookFormCard extends StatelessWidget {
           ),
           SizedBox(height: 8.h),
           Text(
-            'Complete the fields below and publish the listing when everything looks correct.',
+            state.isEditing
+                ? 'Update the selected listing, adjust the price, and save your changes.'
+                : 'Complete the fields below and publish the listing when everything looks correct.',
             style: TextStyle(
               fontSize: 13.sp,
               height: 1.45,
@@ -318,6 +390,11 @@ class _AddBookFormCard extends StatelessWidget {
             hint: 'Robert C. Martin',
             prefixIcon: Icons.edit_note_rounded,
             onChanged: cubit.updateAuthor,
+          ),
+          SizedBox(height: 14.h),
+          _CategorySelectorSection(
+            selectedCategories: state.draft.categories,
+            onToggleCategory: cubit.toggleCategory,
           ),
           SizedBox(height: 14.h),
           AppTextField(
@@ -356,13 +433,17 @@ class _AddBookFormCard extends StatelessWidget {
                 ),
                 const StepRow(
                   step: '2',
-                  text: 'Add title, author, price, and description.',
+                  text:
+                      'Add title, author, price, description, and categories.',
                 ),
-                const StepRow(step: '3', text: 'Review all listing details.'),
-                const StepRow(step: '4', text: 'Check listing preview.'),
+                const StepRow(
+                  step: '3',
+                  text: 'Review price trend and preview.',
+                ),
+                const StepRow(step: '4', text: 'Edit or reset when needed.'),
                 const StepRow(
                   step: '5',
-                  text: 'Tap Publish to post your sale.',
+                  text: 'Save the listing and view all inventory.',
                 ),
               ],
             ),
@@ -415,6 +496,16 @@ class _AddBookFormCard extends StatelessWidget {
                           fontSize: 12.sp,
                         ),
                       ),
+                      SizedBox(height: 4.h),
+                      Text(
+                        state.draft.categories.isEmpty
+                            ? 'Categories are optional for this listing'
+                            : 'Categories: ${state.draft.categoryLabel}',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.78),
+                          fontSize: 12.sp,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -422,29 +513,192 @@ class _AddBookFormCard extends StatelessWidget {
             ),
           ),
           SizedBox(height: 24.h),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: state.canPublish ? cubit.publish : null,
-              icon: const Icon(Icons.cloud_upload_rounded),
-              label: Text(
-                state.isPublishing ? 'Publishing...' : 'Publish Listing',
-                style: TextStyle(
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.w700,
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: state.canPublish ? cubit.saveListing : null,
+                  icon: primaryActionIcon,
+                  label: Text(
+                    primaryActionLabel,
+                    style: TextStyle(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.white,
+                    minimumSize: Size(double.infinity, 50.h),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20.r),
+                    ),
+                  ),
                 ),
               ),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: AppColors.white,
-                minimumSize: Size(double.infinity, 50.h),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(20.r),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: cubit.viewAllListings,
+                  icon: const Icon(Icons.visibility_rounded),
+                  label: const Text('View All Listings'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.dark,
+                    minimumSize: Size(double.infinity, 50.h),
+                    side: BorderSide(color: AppColors.border),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20.r),
+                    ),
+                  ),
                 ),
               ),
-            ),
+            ],
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CategorySelectorSection extends StatelessWidget {
+  const _CategorySelectorSection({
+    required this.selectedCategories,
+    required this.onToggleCategory,
+  });
+
+  final List<String> selectedCategories;
+  final ValueChanged<String> onToggleCategory;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(24.r),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Categories',
+                  style: TextStyle(
+                    fontSize: 15.sp,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.dark,
+                  ),
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 7.h),
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(16.r),
+                ),
+                child: Text(
+                  selectedCategories.isEmpty
+                      ? 'Optional'
+                      : '${selectedCategories.length} selected',
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8.h),
+          Text(
+            'Choose one or more categories for this book. Leave them blank if you want.',
+            style: TextStyle(
+              fontSize: 13.sp,
+              height: 1.45,
+              color: AppColors.muted,
+            ),
+          ),
+          SizedBox(height: 14.h),
+          Wrap(
+            spacing: 10.w,
+            runSpacing: 10.h,
+            children: [
+              for (final category in kBookCategories)
+                _CategoryChip(
+                  label: category,
+                  isSelected: selectedCategories.contains(category),
+                  onTap: () => onToggleCategory(category),
+                ),
+            ],
+          ),
+          if (selectedCategories.isNotEmpty) ...[
+            SizedBox(height: 14.h),
+            Text(
+              'Selected: ${selectedCategories.join(', ')}',
+              style: TextStyle(
+                fontSize: 12.sp,
+                fontWeight: FontWeight.w700,
+                color: AppColors.dark,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CategoryChip extends StatelessWidget {
+  const _CategoryChip({
+    required this.label,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      borderRadius: BorderRadius.circular(18.r),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 11.h),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : AppColors.white,
+          borderRadius: BorderRadius.circular(18.r),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.border,
+          ),
+        ),
+        child: Wrap(
+          spacing: 8.w,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: [
+            Icon(
+              isSelected
+                  ? Icons.check_circle_rounded
+                  : Icons.add_circle_outline_rounded,
+              size: 16.sp,
+              color: isSelected ? Colors.white : AppColors.primary,
+            ),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 13.sp,
+                fontWeight: FontWeight.w700,
+                color: isSelected ? Colors.white : AppColors.dark,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -461,7 +715,7 @@ class _HeroSellCard extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.all(22.w),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           colors: [AppColors.dark, AppColors.primary],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -501,7 +755,9 @@ class _HeroSellCard extends StatelessWidget {
                 ),
                 SizedBox(height: 14.h),
                 Text(
-                  state.draft.imagePath == null
+                  state.isEditing
+                      ? 'Tune the details and refresh your listing fast.'
+                      : state.draft.imagePath == null
                       ? 'Create a polished book listing in minutes.'
                       : 'Your listing is almost ready to go live.',
                   style: TextStyle(
@@ -513,7 +769,7 @@ class _HeroSellCard extends StatelessWidget {
                 ),
                 SizedBox(height: 10.h),
                 Text(
-                  'Add one clear image, enter the book details, and finish the sale form below.',
+                  'Add one clear image, track price movement, and keep your inventory updated from one place.',
                   style: TextStyle(
                     color: AppColors.white.withValues(alpha: 0.82),
                     fontSize: 13.sp,
@@ -578,12 +834,22 @@ class _ImagePickerCard extends StatelessWidget {
             child: ClipRRect(
               borderRadius: BorderRadius.circular(28.r),
               child: hasImage
-                  ? _SelectedImageView(
-                      imageBytes: state.draft.imageBytes!,
-                    )
+                  ? _SelectedImageView(imageBytes: state.draft.imageBytes!)
                   : const _ImagePickerPlaceholder(),
             ),
           ),
+          if (state.isProcessingImage)
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.82),
+                  borderRadius: BorderRadius.circular(28.r),
+                ),
+                child: const Center(
+                  child: AppLoadingIndicator(label: 'Compressing image...'),
+                ),
+              ),
+            ),
           Positioned(
             right: 14.w,
             top: 14.h,
@@ -603,7 +869,11 @@ class _ImagePickerCard extends StatelessWidget {
                   ),
                   SizedBox(width: 6.w),
                   Text(
-                    hasImage ? 'Image Ready' : 'Add Image',
+                    state.isProcessingImage
+                        ? 'Optimizing'
+                        : hasImage
+                        ? 'Image Ready'
+                        : 'Add Image',
                     style: TextStyle(
                       color: AppColors.white,
                       fontSize: 12.sp,
@@ -624,7 +894,11 @@ class _ImagePickerCard extends StatelessWidget {
                 borderRadius: BorderRadius.circular(18.r),
               ),
               child: Text(
-                hasImage ? 'Tap to replace image' : 'Tap to add book image',
+                state.isProcessingImage
+                    ? 'Please wait while the image is compressed'
+                    : hasImage
+                    ? 'Tap to replace image'
+                    : 'Tap to add book image',
                 style: TextStyle(
                   fontSize: 13.sp,
                   fontWeight: FontWeight.w700,
@@ -634,6 +908,272 @@ class _ImagePickerCard extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SellInsightsCard extends StatelessWidget {
+  const _SellInsightsCard({required this.books, required this.draftPrice});
+
+  final List<BookModel> books;
+  final double draftPrice;
+
+  @override
+  Widget build(BuildContext context) {
+    final recentBooks = books.take(6).toList().reversed.toList();
+    final chartBooks = recentBooks.isEmpty
+        ? [const BookModel(price: '0')]
+        : recentBooks;
+    final averagePrice = books.isEmpty
+        ? 0.0
+        : books.fold<double>(0, (sum, book) => sum + book.priceValue) /
+              books.length;
+    final highestPrice = books.fold<double>(
+      0,
+      (maxValue, book) =>
+          book.priceValue > maxValue ? book.priceValue : maxValue,
+    );
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(18.w),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(24.r),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  'Sell Price Trend',
+                  style: TextStyle(
+                    fontSize: 17.sp,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.dark,
+                  ),
+                ),
+              ),
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 7.h),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16.r),
+                ),
+                child: Text(
+                  draftPrice > 0
+                      ? 'Draft: ₹${draftPrice.toStringAsFixed(0)}'
+                      : 'Draft pending',
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 8.h),
+          Text(
+            'See how your latest listing prices move before you publish the next one.',
+            style: TextStyle(
+              fontSize: 13.sp,
+              height: 1.45,
+              color: AppColors.muted,
+            ),
+          ),
+          SizedBox(height: 18.h),
+          SizedBox(
+            height: 190.h,
+            child: LineChart(
+              LineChartData(
+                minY: 0,
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: 100,
+                  getDrawingHorizontalLine: (value) =>
+                      FlLine(color: AppColors.border, strokeWidth: 1),
+                ),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 42.w,
+                      interval: 100,
+                      getTitlesWidget: (value, meta) => Text(
+                        '₹${value.toInt()}',
+                        style: TextStyle(
+                          fontSize: 10.sp,
+                          color: AppColors.muted,
+                        ),
+                      ),
+                    ),
+                  ),
+                  rightTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  topTitles: const AxisTitles(
+                    sideTitles: SideTitles(showTitles: false),
+                  ),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      getTitlesWidget: (value, meta) {
+                        final index = value.toInt();
+                        if (index < 0 || index >= chartBooks.length) {
+                          return const SizedBox.shrink();
+                        }
+
+                        return Padding(
+                          padding: EdgeInsets.only(top: 8.h),
+                          child: Text(
+                            'B${index + 1}',
+                            style: TextStyle(
+                              fontSize: 10.sp,
+                              color: AppColors.muted,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                lineBarsData: [
+                  LineChartBarData(
+                    isCurved: true,
+                    barWidth: 3.2,
+                    color: AppColors.primary,
+                    spots: [
+                      for (int index = 0; index < chartBooks.length; index++)
+                        FlSpot(index.toDouble(), chartBooks[index].priceValue),
+                    ],
+                    dotData: FlDotData(
+                      show: true,
+                      getDotPainter: (spot, percent, bar, index) =>
+                          FlDotCirclePainter(
+                            radius: 4.2,
+                            color: AppColors.white,
+                            strokeWidth: 2.2,
+                            strokeColor: AppColors.primary,
+                          ),
+                    ),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.primary.withValues(alpha: 0.24),
+                          AppColors.primary.withValues(alpha: 0.04),
+                        ],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          SizedBox(height: 16.h),
+          Row(
+            children: [
+              Expanded(
+                child: _InsightStat(
+                  label: 'Average',
+                  value: '₹${averagePrice.toStringAsFixed(0)}',
+                ),
+              ),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: _InsightStat(
+                  label: 'Highest',
+                  value: '₹${highestPrice.toStringAsFixed(0)}',
+                ),
+              ),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: _InsightStat(
+                  label: 'Listings',
+                  value: '${books.length}',
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InsightStat extends StatelessWidget {
+  const _InsightStat({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(18.r),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 11.sp,
+              fontWeight: FontWeight.w700,
+              color: AppColors.muted,
+            ),
+          ),
+          SizedBox(height: 6.h),
+          Text(
+            value,
+            style: TextStyle(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.w800,
+              color: AppColors.dark,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AddBookLoadingView extends StatelessWidget {
+  const _AddBookLoadingView();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, 130.h),
+      child: AppShimmer(
+        child: Column(
+          children: [
+            AppShimmerBox(height: 180.h, radius: 30.r),
+            SizedBox(height: 20.h),
+            AppShimmerBox(height: 240.h, radius: 28.r),
+            SizedBox(height: 20.h),
+            AppShimmerBox(height: 460.h, radius: 28.r),
+          ],
+        ),
       ),
     );
   }
