@@ -1,5 +1,14 @@
 import 'package:bookcart/core/constants/app_colors.dart';
+import 'package:bookcart/core/utils/app_animation_utils.dart';
+import 'package:bookcart/data/models/chat_model.dart';
+import 'package:bookcart/data/models/user_model.dart';
+import 'package:bookcart/logic/cubits/auth_cubit.dart';
+import 'package:bookcart/logic/cubits/chat_cubit.dart';
+import 'package:bookcart/logic/cubits/chat_state.dart';
+import 'package:bookcart/presentation/widgets/app_loading_indicator.dart';
+import 'package:bookcart/presentation/widgets/app_toast.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -10,101 +19,9 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
-  static const List<_ChatPreview> _allChats = [
-    _ChatPreview(
-      name: 'Aman Verma',
-      bookTitle: 'Engineering Mechanics',
-      status: 'Interested buyer',
-      lastMessage: 'Is this book still available?',
-      time: '10:24 AM',
-      unreadCount: 2,
-      priceTag: 'Rs 420',
-      messages: [
-        _ChatMessage(
-          text: 'Hi, I saw your listing for Engineering Mechanics.',
-          isMine: false,
-          time: '10:11 AM',
-        ),
-        _ChatMessage(
-          text: 'Yes, it is available and in good condition.',
-          isMine: true,
-          time: '10:14 AM',
-        ),
-        _ChatMessage(
-          text: 'Is this book still available?',
-          isMine: false,
-          time: '10:24 AM',
-        ),
-      ],
-    ),
-    _ChatPreview(
-      name: 'Priya Das',
-      bookTitle: 'Mathematics Basics',
-      status: 'Negotiating',
-      lastMessage: 'Can you share the condition of the pages?',
-      time: 'Yesterday',
-      unreadCount: 0,
-      priceTag: 'Rs 280',
-      messages: [
-        _ChatMessage(
-          text: 'Can you share the condition of the pages?',
-          isMine: false,
-          time: 'Yesterday',
-        ),
-        _ChatMessage(
-          text: 'Pages are clean and only lightly used.',
-          isMine: true,
-          time: 'Yesterday',
-        ),
-      ],
-    ),
-    _ChatPreview(
-      name: 'Rahul Sen',
-      bookTitle: 'Competitive Exam Toolkit',
-      status: 'Pickup planned',
-      lastMessage: 'I can pick it up this evening.',
-      time: 'Mon',
-      unreadCount: 0,
-      priceTag: 'Rs 550',
-      messages: [
-        _ChatMessage(
-          text: 'I can pick it up this evening.',
-          isMine: false,
-          time: 'Mon',
-        ),
-        _ChatMessage(
-          text: 'That works. Message me before you arrive.',
-          isMine: true,
-          time: 'Mon',
-        ),
-      ],
-    ),
-    _ChatPreview(
-      name: 'Sneha Kapoor',
-      bookTitle: 'Modern Physics',
-      status: 'New message',
-      lastMessage: 'Can you hold this till tomorrow afternoon?',
-      time: 'Sun',
-      unreadCount: 1,
-      priceTag: 'Rs 360',
-      messages: [
-        _ChatMessage(
-          text: 'Can you hold this till tomorrow afternoon?',
-          isMine: false,
-          time: 'Sun',
-        ),
-        _ChatMessage(
-          text: 'Yes, I can keep it aside till 2 PM.',
-          isMine: true,
-          time: 'Sun',
-        ),
-      ],
-    ),
-  ];
-
   late final TextEditingController _searchController;
-  int _selectedChatIndex = 0;
   String _query = '';
+  String? _watchingUserId;
 
   @override
   void initState() {
@@ -118,202 +35,257 @@ class _ChatScreenState extends State<ChatScreen> {
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final filteredChats = _allChats.where((chat) {
-      final query = _query.trim().toLowerCase();
-      if (query.isEmpty) {
-        return true;
-      }
-
-      return chat.name.toLowerCase().contains(query) ||
-          chat.bookTitle.toLowerCase().contains(query) ||
-          chat.lastMessage.toLowerCase().contains(query) ||
-          chat.status.toLowerCase().contains(query);
-    }).toList();
-
-    if (filteredChats.isEmpty) {
-      _selectedChatIndex = 0;
-    } else if (_selectedChatIndex >= filteredChats.length) {
-      _selectedChatIndex = 0;
+  void _watchChats(UserModel? user) {
+    if (user == null || _watchingUserId == user.id) {
+      return;
     }
 
-    final selectedChat = filteredChats.isEmpty
-        ? null
-        : filteredChats[_selectedChatIndex];
+    _watchingUserId = user.id;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      context.read<ChatCubit>().watchChatsForUser(user.id);
+    });
+  }
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= 1000;
+  @override
+  Widget build(BuildContext context) {
+    final user = context.watch<AuthCubit>().state.user;
+    _watchChats(user);
 
-        return SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(20.w, 16.h, 20.w, isWide ? 24.h : 130.h),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: isWide ? 1260 : 760),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (isWide) ...[
-                    const _ChatHeroCard(),
-                    SizedBox(height: 22.h),
-                  ],
-                  Text(
-                    'Chats',
-                    style: TextStyle(
-                      fontSize: 28.sp,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.dark,
-                    ),
-                  ),
-                  SizedBox(height: 8.h),
-                  Text(
-                    'Open a conversation to view buyer messages and reply about listings.',
-                    style: TextStyle(
-                      fontSize: 14.sp,
-                      height: 1.45,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                  SizedBox(height: 18.h),
-                  TextField(
-                    controller: _searchController,
-                    onChanged: (value) {
-                      setState(() {
-                        _query = value;
-                      });
-                    },
-                    decoration: InputDecoration(
-                      hintText: 'Search buyer chats or book name',
-                      prefixIcon: const Icon(Icons.search_rounded),
-                      suffixIcon: _query.isEmpty
-                          ? Container(
-                              margin: EdgeInsets.all(8.w),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(16.r),
-                              ),
-                              child: Icon(
-                                Icons.tune_rounded,
-                                color: AppColors.primary,
-                                size: 18.sp,
-                              ),
-                            )
-                          : IconButton(
-                              onPressed: () {
-                                _searchController.clear();
-                                setState(() {
-                                  _query = '';
-                                });
-                              },
-                              icon: const Icon(Icons.close_rounded),
-                            ),
-                      filled: true,
-                      fillColor: AppColors.white,
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 18.w,
-                        vertical: 16.h,
-                      ),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(22.r),
-                        borderSide: BorderSide.none,
-                      ),
-                      enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(22.r),
-                        borderSide: BorderSide(color: AppColors.border),
-                      ),
-                      focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(22.r),
-                        borderSide: BorderSide(
-                          color: AppColors.primary,
-                          width: 1.4,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(height: 16.h),
-                  Row(
+    if (user == null) {
+      return const Center(
+        child: AppLoadingIndicator(label: 'Loading your chat account...'),
+      );
+    }
+
+    return BlocConsumer<ChatCubit, ChatState>(
+      listenWhen: (previous, current) =>
+          previous.errorMessage != current.errorMessage ||
+          previous.successMessage != current.successMessage,
+      listener: (context, state) {
+        if (state.errorMessage != null) {
+          AppToast.show(
+            context,
+            message: state.errorMessage!,
+            type: AppToastType.error,
+          );
+          context.read<ChatCubit>().clearFeedback();
+          return;
+        }
+
+        if (state.successMessage != null) {
+          context.read<ChatCubit>().clearFeedback();
+        }
+      },
+      builder: (context, state) {
+        final query = _query.trim().toLowerCase();
+        final filteredThreads = state.threads.where((thread) {
+          if (query.isEmpty) {
+            return true;
+          }
+
+          return thread.displayNameFor(user.id).toLowerCase().contains(query) ||
+              thread.bookTitle.toLowerCase().contains(query) ||
+              thread.displayLastMessage.toLowerCase().contains(query);
+        }).toList();
+        final selectedThread = state.selectedThread;
+
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final isWide = constraints.maxWidth >= 1000;
+
+            return SingleChildScrollView(
+              padding: EdgeInsets.fromLTRB(
+                20.w,
+                16.h,
+                20.w,
+                isWide ? 24.h : 130.h,
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(maxWidth: isWide ? 1260 : 760),
+                  child: AppStaggeredColumn(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: _ChatStatCard(
-                          label: 'Unread',
-                          value:
-                              '${_allChats.fold<int>(0, (sum, chat) => sum + chat.unreadCount)}',
-                          icon: Icons.mark_chat_unread_rounded,
-                        ),
-                      ),
-                      SizedBox(width: 12.w),
-                      Expanded(
-                        child: _ChatStatCard(
-                          label: 'Books',
-                          value: '${_allChats.length}',
-                          icon: Icons.menu_book_rounded,
-                        ),
-                      ),
                       if (isWide) ...[
-                        SizedBox(width: 12.w),
-                        Expanded(
-                          child: _ChatStatCard(
-                            label: 'Pickup ready',
-                            value:
-                                '${_allChats.where((chat) => chat.status == 'Pickup planned').length}',
-                            icon: Icons.local_shipping_rounded,
-                          ),
-                        ),
+                        const _ChatHeroCard(),
+                        SizedBox(height: 22.h),
                       ],
-                    ],
-                  ),
-                  SizedBox(height: 18.h),
-                  _RecentConversationSummary(chatCount: filteredChats.length),
-                  SizedBox(height: 18.h),
-                  if (isWide)
-                    SizedBox(
-                      height: 720.h,
-                      child: Row(
+                      Text(
+                        'Chats',
+                        style: TextStyle(
+                          fontSize: 28.sp,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.dark,
+                        ),
+                      ),
+                      SizedBox(height: 8.h),
+                      Text(
+                        'Buyer and seller messages update live as new replies arrive.',
+                        style: TextStyle(
+                          fontSize: 14.sp,
+                          height: 1.45,
+                          color: AppColors.muted,
+                        ),
+                      ),
+                      SizedBox(height: 18.h),
+                      _ChatSearchField(
+                        controller: _searchController,
+                        query: _query,
+                        onChanged: (value) {
+                          setState(() {
+                            _query = value;
+                          });
+                        },
+                        onClear: () {
+                          _searchController.clear();
+                          setState(() {
+                            _query = '';
+                          });
+                        },
+                      ),
+                      SizedBox(height: 16.h),
+                      Row(
                         children: [
-                          SizedBox(
-                            width: 380.w,
-                            child: _InboxPanel(
-                              chats: filteredChats,
-                              selectedIndex: _selectedChatIndex,
-                              onSelect: (index) {
-                                setState(() {
-                                  _selectedChatIndex = index;
-                                });
-                              },
+                          Expanded(
+                            child: _ChatStatCard(
+                              label: 'Live chats',
+                              value: '${state.threads.length}',
+                              icon: Icons.forum_rounded,
                             ),
                           ),
-                          SizedBox(width: 18.w),
+                          SizedBox(width: 12.w),
                           Expanded(
-                            child: selectedChat == null
-                                ? const _EmptyConversationState()
-                                : _ConversationPanel(chat: selectedChat),
+                            child: _ChatStatCard(
+                              label: 'Visible',
+                              value: '${filteredThreads.length}',
+                              icon: Icons.menu_book_rounded,
+                            ),
                           ),
                         ],
                       ),
-                    )
-                  else
-                    _MobileInboxList(chats: filteredChats),
-                ],
+                      SizedBox(height: 18.h),
+                      if (state.isLoadingThreads)
+                        const _ChatLoadingCard()
+                      else if (isWide)
+                        SizedBox(
+                          height: 720.h,
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 390.w,
+                                child: _ThreadList(
+                                  threads: filteredThreads,
+                                  selectedThreadId: selectedThread?.id,
+                                  currentUserId: user.id,
+                                  onSelect: (thread) => context
+                                      .read<ChatCubit>()
+                                      .selectThread(thread.id),
+                                ),
+                              ),
+                              SizedBox(width: 18.w),
+                              Expanded(
+                                child: selectedThread == null
+                                    ? const _EmptyConversationState()
+                                    : _ConversationPanel(
+                                        thread: selectedThread,
+                                        messages: state.messages,
+                                        currentUser: user,
+                                        isSending: state.isSending,
+                                      ),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        _MobileThreadList(
+                          threads: filteredThreads,
+                          currentUser: user,
+                        ),
+                    ],
+                  ),
+                ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
   }
 }
 
-class _InboxPanel extends StatelessWidget {
-  const _InboxPanel({
-    required this.chats,
-    required this.selectedIndex,
+class _ChatSearchField extends StatelessWidget {
+  const _ChatSearchField({
+    required this.controller,
+    required this.query,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  final TextEditingController controller;
+  final String query;
+  final ValueChanged<String> onChanged;
+  final VoidCallback onClear;
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      onChanged: onChanged,
+      decoration: InputDecoration(
+        hintText: 'Search chats or book name',
+        prefixIcon: const Icon(Icons.search_rounded),
+        suffixIcon: query.isEmpty
+            ? Container(
+                margin: EdgeInsets.all(8.w),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(16.r),
+                ),
+                child: Icon(
+                  Icons.tune_rounded,
+                  color: AppColors.primary,
+                  size: 18.sp,
+                ),
+              )
+            : IconButton(
+                onPressed: onClear,
+                icon: const Icon(Icons.close_rounded),
+              ),
+        filled: true,
+        fillColor: AppColors.white,
+        contentPadding: EdgeInsets.symmetric(horizontal: 18.w, vertical: 16.h),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(22.r),
+          borderSide: BorderSide.none,
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(22.r),
+          borderSide: BorderSide(color: AppColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(22.r),
+          borderSide: BorderSide(color: AppColors.primary, width: 1.4),
+        ),
+      ),
+    );
+  }
+}
+
+class _ThreadList extends StatelessWidget {
+  const _ThreadList({
+    required this.threads,
+    required this.selectedThreadId,
+    required this.currentUserId,
     required this.onSelect,
   });
 
-  final List<_ChatPreview> chats;
-  final int selectedIndex;
-  final ValueChanged<int> onSelect;
+  final List<ChatThreadModel> threads;
+  final String? selectedThreadId;
+  final String currentUserId;
+  final ValueChanged<ChatThreadModel> onSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -330,63 +302,34 @@ class _InboxPanel extends StatelessWidget {
             child: Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Recent Conversations',
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.dark,
-                        ),
-                      ),
-                      SizedBox(height: 4.h),
-                      Text(
-                        '${chats.length} visible threads',
-                        style: TextStyle(
-                          fontSize: 12.sp,
-                          color: AppColors.muted,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: EdgeInsets.symmetric(
-                    horizontal: 12.w,
-                    vertical: 8.h,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(14.r),
-                  ),
                   child: Text(
-                    'Inbox',
+                    'Recent Conversations',
                     style: TextStyle(
-                      fontSize: 12.sp,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.dark,
                     ),
                   ),
                 ),
+                _HeaderBadge(label: 'Live'),
               ],
             ),
           ),
           Divider(height: 1, color: AppColors.border),
           Expanded(
-            child: chats.isEmpty
+            child: threads.isEmpty
                 ? const _EmptyConversationState(compact: true)
                 : ListView.separated(
                     padding: EdgeInsets.all(14.w),
-                    itemCount: chats.length,
+                    itemCount: threads.length,
                     separatorBuilder: (_, __) => SizedBox(height: 10.h),
                     itemBuilder: (context, index) {
-                      final chat = chats[index];
-                      return _ChatTile(
-                        chat: chat,
-                        isSelected: index == selectedIndex,
-                        onTap: () => onSelect(index),
+                      final thread = threads[index];
+                      return _ThreadTile(
+                        thread: thread,
+                        currentUserId: currentUserId,
+                        isSelected: thread.id == selectedThreadId,
+                        onTap: () => onSelect(thread),
                       );
                     },
                   ),
@@ -397,47 +340,185 @@ class _InboxPanel extends StatelessWidget {
   }
 }
 
-class _MobileInboxList extends StatelessWidget {
-  const _MobileInboxList({required this.chats});
+class _MobileThreadList extends StatelessWidget {
+  const _MobileThreadList({required this.threads, required this.currentUser});
 
-  final List<_ChatPreview> chats;
+  final List<ChatThreadModel> threads;
+  final UserModel currentUser;
 
   @override
   Widget build(BuildContext context) {
-    if (chats.isEmpty) {
+    if (threads.isEmpty) {
       return const _EmptyConversationState();
     }
 
     return Column(
-      children: chats
-          .map(
-            (chat) => Padding(
-              padding: EdgeInsets.only(bottom: 14.h),
-              child: _ChatTile(
-                chat: chat,
-                isSelected: false,
-                onTap: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (_) => _ChatDetailScreen(chat: chat),
+      children: [
+        for (final thread in threads)
+          Padding(
+            padding: EdgeInsets.only(bottom: 14.h),
+            child: _ThreadTile(
+              thread: thread,
+              currentUserId: currentUser.id,
+              isSelected: false,
+              onTap: () {
+                context.read<ChatCubit>().selectThread(thread.id);
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => _MobileConversationScreen(
+                      thread: thread,
+                      currentUser: currentUser,
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
-          )
-          .toList(),
+          ),
+      ],
     );
   }
 }
 
-class _ConversationPanel extends StatelessWidget {
-  const _ConversationPanel({required this.chat});
+class _MobileConversationScreen extends StatelessWidget {
+  const _MobileConversationScreen({
+    required this.thread,
+    required this.currentUser,
+  });
 
-  final _ChatPreview chat;
+  final ChatThreadModel thread;
+  final UserModel currentUser;
 
   @override
   Widget build(BuildContext context) {
+    return BlocBuilder<ChatCubit, ChatState>(
+      builder: (context, state) {
+        final liveThread = state.selectedThread ?? thread;
+
+        return Scaffold(
+          backgroundColor: AppColors.background,
+          appBar: AppBar(
+            backgroundColor: AppColors.background,
+            surfaceTintColor: Colors.transparent,
+            titleSpacing: 0,
+            title: Row(
+              children: [
+                _Avatar(name: liveThread.displayNameFor(currentUser.id)),
+                SizedBox(width: 12.w),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(liveThread.displayNameFor(currentUser.id)),
+                      Text(
+                        liveThread.bookTitle,
+                        style: TextStyle(
+                          fontSize: 12.sp,
+                          color: AppColors.muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          body: SafeArea(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(16.w, 10.h, 16.w, 16.h),
+              child: _ConversationPanel(
+                thread: liveThread,
+                messages: state.messages,
+                currentUser: currentUser,
+                isSending: state.isSending,
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ConversationPanel extends StatefulWidget {
+  const _ConversationPanel({
+    required this.thread,
+    required this.messages,
+    required this.currentUser,
+    required this.isSending,
+  });
+
+  final ChatThreadModel thread;
+  final List<ChatMessageModel> messages;
+  final UserModel currentUser;
+  final bool isSending;
+
+  @override
+  State<_ConversationPanel> createState() => _ConversationPanelState();
+}
+
+class _ConversationPanelState extends State<_ConversationPanel> {
+  late final TextEditingController _messageController;
+  late final ScrollController _messagesScrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _messageController = TextEditingController();
+    _messagesScrollController = ScrollController();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToLatest());
+  }
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    _messagesScrollController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _send() async {
+    final text = _messageController.text.trim();
+    if (text.isEmpty) {
+      return;
+    }
+
+    final sent = await context.read<ChatCubit>().sendMessage(
+      sender: widget.currentUser,
+      text: text,
+    );
+    if (!mounted || !sent) {
+      return;
+    }
+
+    _messageController.clear();
+    _jumpToLatest();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ConversationPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.thread.id != widget.thread.id ||
+        oldWidget.messages.length != widget.messages.length) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _jumpToLatest());
+    }
+  }
+
+  void _jumpToLatest() {
+    if (!mounted || !_messagesScrollController.hasClients) {
+      return;
+    }
+
+    _messagesScrollController.animateTo(
+      _messagesScrollController.position.minScrollExtent,
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOut,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final otherName = widget.thread.displayNameFor(widget.currentUser.id);
+    final visibleMessages = widget.messages.reversed.toList(growable: false);
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.white,
@@ -450,25 +531,14 @@ class _ConversationPanel extends StatelessWidget {
             padding: EdgeInsets.fromLTRB(20.w, 20.h, 20.w, 16.h),
             child: Row(
               children: [
-                CircleAvatar(
-                  radius: 24.r,
-                  backgroundColor: AppColors.primary.withValues(alpha: 0.14),
-                  child: Text(
-                    chat.name.characters.first,
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 16.sp,
-                    ),
-                  ),
-                ),
+                _Avatar(name: otherName),
                 SizedBox(width: 14.w),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        chat.name,
+                        otherName,
                         style: TextStyle(
                           fontSize: 18.sp,
                           fontWeight: FontWeight.w800,
@@ -477,7 +547,7 @@ class _ConversationPanel extends StatelessWidget {
                       ),
                       SizedBox(height: 4.h),
                       Text(
-                        '${chat.bookTitle}  •  ${chat.status}',
+                        '${widget.thread.bookTitle}  •  ${widget.thread.statusFor(widget.currentUser.id)}',
                         style: TextStyle(
                           fontSize: 13.sp,
                           color: AppColors.muted,
@@ -486,7 +556,7 @@ class _ConversationPanel extends StatelessWidget {
                     ],
                   ),
                 ),
-                _HeaderBadge(label: chat.priceTag),
+                _HeaderBadge(label: widget.thread.priceTag),
               ],
             ),
           ),
@@ -516,95 +586,37 @@ class _ConversationPanel extends StatelessWidget {
                   ),
                   SizedBox(width: 12.w),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          chat.bookTitle,
-                          style: TextStyle(
-                            fontSize: 14.sp,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.dark,
-                          ),
-                        ),
-                        SizedBox(height: 4.h),
-                        Text(
-                          'Discuss condition, pricing, and pickup details here.',
-                          style: TextStyle(
-                            fontSize: 12.sp,
-                            color: AppColors.muted,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      widget.thread.bookTitle,
+                      style: TextStyle(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.dark,
+                      ),
                     ),
                   ),
-                  _HeaderBadge(label: chat.status),
+                  _HeaderBadge(label: 'Live'),
                 ],
               ),
             ),
           ),
           Divider(height: 1, color: AppColors.border),
           Expanded(
-            child: ListView.builder(
-              padding: EdgeInsets.fromLTRB(20.w, 18.h, 20.w, 18.h),
-              itemCount: chat.messages.length,
-              itemBuilder: (_, index) {
-                final message = chat.messages[index];
-                return Align(
-                  alignment: message.isMine
-                      ? Alignment.centerRight
-                      : Alignment.centerLeft,
-                  child: Container(
-                    margin: EdgeInsets.only(bottom: 12.h),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 16.w,
-                      vertical: 12.h,
-                    ),
-                    constraints: BoxConstraints(maxWidth: 360.w),
-                    decoration: BoxDecoration(
-                      color: message.isMine
-                          ? AppColors.primary
-                          : AppColors.background,
-                      borderRadius: BorderRadius.only(
-                        topLeft: Radius.circular(20.r),
-                        topRight: Radius.circular(20.r),
-                        bottomLeft: Radius.circular(
-                          message.isMine ? 20.r : 8.r,
-                        ),
-                        bottomRight: Radius.circular(
-                          message.isMine ? 8.r : 20.r,
-                        ),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          message.text,
-                          style: TextStyle(
-                            fontSize: 13.sp,
-                            height: 1.45,
-                            color: message.isMine
-                                ? Colors.white
-                                : AppColors.dark,
-                          ),
-                        ),
-                        SizedBox(height: 6.h),
-                        Text(
-                          message.time,
-                          style: TextStyle(
-                            fontSize: 10.sp,
-                            color: message.isMine
-                                ? Colors.white.withValues(alpha: 0.76)
-                                : AppColors.muted,
-                          ),
-                        ),
-                      ],
-                    ),
+            child: visibleMessages.isEmpty
+                ? const _EmptyMessagesState()
+                : ListView.builder(
+                    controller: _messagesScrollController,
+                    reverse: true,
+                    padding: EdgeInsets.fromLTRB(20.w, 18.h, 20.w, 18.h),
+                    itemCount: visibleMessages.length,
+                    itemBuilder: (_, index) {
+                      final message = visibleMessages[index];
+                      return _MessageBubble(
+                        message: message,
+                        isMine: message.senderId == widget.currentUser.id,
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
           Padding(
             padding: EdgeInsets.fromLTRB(20.w, 12.h, 20.w, 20.h),
@@ -612,8 +624,13 @@ class _ConversationPanel extends StatelessWidget {
               children: [
                 Expanded(
                   child: TextField(
+                    controller: _messageController,
+                    minLines: 1,
+                    maxLines: 4,
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _send(),
                     decoration: InputDecoration(
-                      hintText: 'Reply to ${chat.name.split(' ').first}',
+                      hintText: 'Reply to ${otherName.split(' ').first}',
                       filled: true,
                       fillColor: AppColors.background,
                       contentPadding: EdgeInsets.symmetric(
@@ -636,11 +653,13 @@ class _ConversationPanel extends StatelessWidget {
                   width: 52.w,
                   height: 52.w,
                   decoration: BoxDecoration(
-                    color: AppColors.primary,
+                    color: widget.isSending
+                        ? AppColors.muted
+                        : AppColors.primary,
                     shape: BoxShape.circle,
                   ),
                   child: IconButton(
-                    onPressed: () {},
+                    onPressed: widget.isSending ? null : _send,
                     icon: Icon(
                       Icons.send_rounded,
                       color: Colors.white,
@@ -657,114 +676,89 @@ class _ConversationPanel extends StatelessWidget {
   }
 }
 
-class _RecentConversationSummary extends StatelessWidget {
-  const _RecentConversationSummary({required this.chatCount});
+class _ThreadTile extends StatelessWidget {
+  const _ThreadTile({
+    required this.thread,
+    required this.currentUserId,
+    required this.isSelected,
+    required this.onTap,
+  });
 
-  final int chatCount;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(16.w),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(24.r),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 52.w,
-            height: 52.w,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(16.r),
-            ),
-            child: Icon(
-              Icons.forum_outlined,
-              color: AppColors.primary,
-              size: 24.sp,
-            ),
-          ),
-          SizedBox(width: 14.w),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Recent Conversations',
-                  style: TextStyle(
-                    fontSize: 15.sp,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.dark,
-                  ),
-                ),
-                SizedBox(height: 4.h),
-                Text(
-                  '$chatCount active buyer chats',
-                  style: TextStyle(fontSize: 12.sp, color: AppColors.muted),
-                ),
-              ],
-            ),
-          ),
-          Container(
-            padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(18.r),
-            ),
-            child: Text(
-              'Inbox',
-              style: TextStyle(
-                fontSize: 12.sp,
-                fontWeight: FontWeight.w700,
-                color: AppColors.primary,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ChatDetailScreen extends StatelessWidget {
-  const _ChatDetailScreen({required this.chat});
-
-  final _ChatPreview chat;
+  final ChatThreadModel thread;
+  final String currentUserId;
+  final bool isSelected;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.background,
-        surfaceTintColor: Colors.transparent,
-        titleSpacing: 0,
-        title: Row(
+    final name = thread.displayNameFor(currentUserId);
+
+    return InkWell(
+      borderRadius: BorderRadius.circular(24.r),
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        padding: EdgeInsets.all(18.w),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.background : AppColors.white,
+          borderRadius: BorderRadius.circular(24.r),
+          border: Border.all(
+            color: isSelected ? AppColors.primary : AppColors.border,
+            width: isSelected ? 1.3 : 1,
+          ),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CircleAvatar(
-              radius: 20.r,
-              backgroundColor: AppColors.primary.withValues(alpha: 0.14),
-              child: Text(
-                chat.name.characters.first,
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 15.sp,
-                ),
-              ),
-            ),
+            _Avatar(name: name),
             SizedBox(width: 12.w),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(chat.name),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Text(
+                          name,
+                          style: TextStyle(
+                            fontSize: 14.sp,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.dark,
+                          ),
+                        ),
+                      ),
+                      SizedBox(width: 8.w),
+                      Text(
+                        thread.displayTime,
+                        style: TextStyle(
+                          fontSize: 11.sp,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.muted,
+                        ),
+                      ),
+                    ],
+                  ),
+                  SizedBox(height: 4.h),
                   Text(
-                    chat.bookTitle,
-                    style: TextStyle(fontSize: 12.sp, color: AppColors.muted),
+                    thread.bookTitle,
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                  SizedBox(height: 6.h),
+                  Text(
+                    thread.displayLastMessage,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 12.sp,
+                      height: 1.35,
+                      color: AppColors.muted,
+                    ),
                   ),
                 ],
               ),
@@ -772,10 +766,55 @@ class _ChatDetailScreen extends StatelessWidget {
           ],
         ),
       ),
-      body: SafeArea(
-        child: Padding(
-          padding: EdgeInsets.fromLTRB(16.w, 10.h, 16.w, 16.h),
-          child: _ConversationPanel(chat: chat),
+    );
+  }
+}
+
+class _MessageBubble extends StatelessWidget {
+  const _MessageBubble({required this.message, required this.isMine});
+
+  final ChatMessageModel message;
+  final bool isMine;
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: isMine ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        margin: EdgeInsets.only(bottom: 12.h),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 12.h),
+        constraints: BoxConstraints(maxWidth: 360.w),
+        decoration: BoxDecoration(
+          color: isMine ? AppColors.primary : AppColors.background,
+          borderRadius: BorderRadius.only(
+            topLeft: Radius.circular(20.r),
+            topRight: Radius.circular(20.r),
+            bottomLeft: Radius.circular(isMine ? 20.r : 8.r),
+            bottomRight: Radius.circular(isMine ? 8.r : 20.r),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              message.text,
+              style: TextStyle(
+                fontSize: 13.sp,
+                height: 1.45,
+                color: isMine ? Colors.white : AppColors.dark,
+              ),
+            ),
+            SizedBox(height: 6.h),
+            Text(
+              message.displayTime,
+              style: TextStyle(
+                fontSize: 10.sp,
+                color: isMine
+                    ? Colors.white.withValues(alpha: 0.76)
+                    : AppColors.muted,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -824,7 +863,7 @@ class _ChatHeroCard extends StatelessWidget {
                 ),
                 SizedBox(height: 14.h),
                 Text(
-                  'Track every inquiry, negotiate faster, and lock pickup plans without leaving the seller workspace.',
+                  'Live chats for book inquiries, offers, and pickup plans.',
                   style: TextStyle(
                     color: Colors.white,
                     fontSize: 24.sp,
@@ -834,7 +873,7 @@ class _ChatHeroCard extends StatelessWidget {
                 ),
                 SizedBox(height: 10.h),
                 Text(
-                  'Inbox-first on mobile, split-view on larger screens.',
+                  'Messages sync instantly for both buyer and seller.',
                   style: TextStyle(
                     color: Colors.white.withValues(alpha: 0.8),
                     fontSize: 13.sp,
@@ -852,39 +891,10 @@ class _ChatHeroCard extends StatelessWidget {
               borderRadius: BorderRadius.circular(26.r),
               border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
             ),
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                Positioned(
-                  top: 18.h,
-                  child: Icon(
-                    Icons.mark_chat_unread_rounded,
-                    color: Colors.white,
-                    size: 38.sp,
-                  ),
-                ),
-                Positioned(
-                  bottom: 18.h,
-                  child: Container(
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 10.w,
-                      vertical: 6.h,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(20.r),
-                    ),
-                    child: Text(
-                      'Live',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 12.sp,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
+            child: Icon(
+              Icons.mark_chat_unread_rounded,
+              color: Colors.white,
+              size: 40.sp,
             ),
           ),
         ],
@@ -925,23 +935,25 @@ class _ChatStatCard extends StatelessWidget {
             child: Icon(icon, color: AppColors.primary, size: 22.sp),
           ),
           SizedBox(width: 12.w),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                value,
-                style: TextStyle(
-                  fontSize: 20.sp,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.dark,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontSize: 20.sp,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.dark,
+                  ),
                 ),
-              ),
-              SizedBox(height: 2.h),
-              Text(
-                label,
-                style: TextStyle(fontSize: 11.sp, color: AppColors.muted),
-              ),
-            ],
+                SizedBox(height: 2.h),
+                Text(
+                  label,
+                  style: TextStyle(fontSize: 11.sp, color: AppColors.muted),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -949,171 +961,25 @@ class _ChatStatCard extends StatelessWidget {
   }
 }
 
-class _ChatTile extends StatelessWidget {
-  const _ChatTile({
-    required this.chat,
-    required this.isSelected,
-    required this.onTap,
-  });
+class _Avatar extends StatelessWidget {
+  const _Avatar({required this.name});
 
-  final _ChatPreview chat;
-  final bool isSelected;
-  final VoidCallback onTap;
+  final String name;
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
-      borderRadius: BorderRadius.circular(24.r),
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        padding: EdgeInsets.all(18.w),
-        decoration: BoxDecoration(
-          color: isSelected ? AppColors.background : AppColors.white,
-          borderRadius: BorderRadius.circular(24.r),
-          border: Border.all(
-            color: isSelected ? AppColors.primary : AppColors.border,
-            width: isSelected ? 1.3 : 1,
-          ),
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            CircleAvatar(
-              radius: 26.r,
-              backgroundColor: AppColors.surface,
-              child: Text(
-                chat.name.characters.first,
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16.sp,
-                ),
-              ),
-            ),
-            SizedBox(width: 12.w),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          chat.name,
-                          style: TextStyle(
-                            fontSize: 14.sp,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.dark,
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 8.w),
-                      Text(
-                        chat.time,
-                        style: TextStyle(
-                          fontSize: 11.sp,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.muted,
-                        ),
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 4.h),
-                  Text(
-                    chat.bookTitle,
-                    style: TextStyle(
-                      fontSize: 12.sp,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  SizedBox(height: 6.h),
-                  Text(
-                    chat.lastMessage,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12.sp,
-                      height: 1.35,
-                      color: AppColors.muted,
-                    ),
-                  ),
-                  SizedBox(height: 10.h),
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 14.w,
-                          vertical: 9.h,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(16.r),
-                        ),
-                        child: Text(
-                          'Book Chat',
-                          style: TextStyle(
-                            fontSize: 11.sp,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 10.w),
-                      Icon(
-                        Icons.done_all_rounded,
-                        size: 18.sp,
-                        color: AppColors.secondary,
-                      ),
-                      const Spacer(),
-                      Container(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: 12.w,
-                          vertical: 9.h,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(18.r),
-                        ),
-                        child: Text(
-                          chat.time,
-                          style: TextStyle(
-                            fontSize: 11.sp,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.muted,
-                          ),
-                        ),
-                      ),
-                      if (chat.unreadCount > 0) ...[
-                        SizedBox(width: 10.w),
-                        Container(
-                          width: 34.w,
-                          height: 34.w,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text(
-                              '${chat.unreadCount}',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 11.sp,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
+    final trimmed = name.trim();
+    final initial = trimmed.isEmpty ? '?' : trimmed[0].toUpperCase();
+
+    return CircleAvatar(
+      radius: 24.r,
+      backgroundColor: AppColors.primary.withValues(alpha: 0.14),
+      child: Text(
+        initial,
+        style: TextStyle(
+          color: AppColors.primary,
+          fontWeight: FontWeight.w800,
+          fontSize: 16.sp,
         ),
       ),
     );
@@ -1142,6 +1008,24 @@ class _HeaderBadge extends StatelessWidget {
           color: AppColors.primary,
         ),
       ),
+    );
+  }
+}
+
+class _ChatLoadingCard extends StatelessWidget {
+  const _ChatLoadingCard();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(28.w),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(28.r),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: const AppLoadingIndicator(label: 'Loading live chats...'),
     );
   }
 }
@@ -1181,7 +1065,7 @@ class _EmptyConversationState extends StatelessWidget {
               ),
               SizedBox(height: 14.h),
               Text(
-                'No conversations found',
+                'No conversations yet',
                 style: TextStyle(
                   fontSize: 16.sp,
                   fontWeight: FontWeight.w800,
@@ -1190,7 +1074,7 @@ class _EmptyConversationState extends StatelessWidget {
               ),
               SizedBox(height: 6.h),
               Text(
-                'Try a different search term to find a buyer conversation.',
+                'Open a book and tap Chat Now to start a live thread.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 12.sp,
@@ -1206,36 +1090,25 @@ class _EmptyConversationState extends StatelessWidget {
   }
 }
 
-class _ChatPreview {
-  const _ChatPreview({
-    required this.name,
-    required this.bookTitle,
-    required this.status,
-    required this.lastMessage,
-    required this.time,
-    required this.unreadCount,
-    required this.priceTag,
-    required this.messages,
-  });
+class _EmptyMessagesState extends StatelessWidget {
+  const _EmptyMessagesState();
 
-  final String name;
-  final String bookTitle;
-  final String status;
-  final String lastMessage;
-  final String time;
-  final int unreadCount;
-  final String priceTag;
-  final List<_ChatMessage> messages;
-}
-
-class _ChatMessage {
-  const _ChatMessage({
-    required this.text,
-    required this.isMine,
-    required this.time,
-  });
-
-  final String text;
-  final bool isMine;
-  final String time;
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(28.w),
+        child: Text(
+          'No messages yet. Send the first reply.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 13.sp,
+            height: 1.45,
+            color: AppColors.muted,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
 }

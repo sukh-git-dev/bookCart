@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:bookcart/core/utils/app_logger.dart';
 import 'package:bookcart/data/models/book_model.dart';
 import 'package:bookcart/data/repository/book_repository.dart';
 import 'package:bookcart/logic/cubits/book_state.dart';
@@ -12,11 +15,56 @@ class BookCubit extends Cubit<BookState> {
 
   final BookRepository _repository;
   final ImagePicker _picker = ImagePicker();
+  StreamSubscription<List<BookModel>>? _booksSubscription;
 
   Future<void> loadBooks() async {
+    AppLogger.info('BookCubit', 'loadBooks: subscribing');
     emit(state.copyWith(isLoadingBooks: true, message: null));
-    final books = await _repository.fetchBooks();
-    emit(state.copyWith(books: books, isLoadingBooks: false, message: null));
+    await _booksSubscription?.cancel();
+    _booksSubscription = _repository.watchBooks().listen(
+      (books) {
+        AppLogger.success(
+          'BookCubit',
+          'Books synced',
+          details: {'count': books.length},
+        );
+        emit(
+          state.copyWith(books: books, isLoadingBooks: false, message: null),
+        );
+      },
+      onError: (error, stackTrace) async {
+        AppLogger.error(
+          'BookCubit',
+          'watchBooks stream error',
+          error: error,
+          stackTrace: stackTrace,
+        );
+        try {
+          final books = await _repository.fetchBooks();
+          AppLogger.success(
+            'BookCubit',
+            'Books fallback fetch succeeded',
+            details: {'count': books.length},
+          );
+          emit(
+            state.copyWith(books: books, isLoadingBooks: false, message: null),
+          );
+        } catch (fetchError, fetchStackTrace) {
+          AppLogger.error(
+            'BookCubit',
+            'Books fallback fetch failed',
+            error: fetchError,
+            stackTrace: fetchStackTrace,
+          );
+          emit(
+            state.copyWith(
+              isLoadingBooks: false,
+              message: 'Could not load books right now.',
+            ),
+          );
+        }
+      },
+    );
   }
 
   void changeTab(int index) {
@@ -24,11 +72,25 @@ class BookCubit extends Cubit<BookState> {
   }
 
   Future<void> pickImage() async {
+    final timer = AppLogger.startTimer('BookCubit', 'pickImage');
+    final remainingSlots = BookModel.maxImages - state.draft.imageCount;
+    if (remainingSlots <= 0) {
+      emit(
+        state.copyWith(
+          message: 'You can upload up to ${BookModel.maxImages} images.',
+        ),
+      );
+      return;
+    }
+
     emit(state.copyWith(isProcessingImage: true, message: null));
 
     try {
-      final image = await _picker.pickImage(source: ImageSource.gallery);
-      if (image == null) {
+      final selectedImages = await _picker.pickMultiImage(
+        limit: remainingSlots,
+      );
+      if (selectedImages.isEmpty) {
+        timer.warning('Image selection cancelled');
         emit(
           state.copyWith(
             isProcessingImage: false,
@@ -38,25 +100,39 @@ class BookCubit extends Cubit<BookState> {
         return;
       }
 
-      final imageBytes = await image.readAsBytes();
-      final compressedBytes = await FlutterImageCompress.compressWithList(
-        imageBytes,
-        minWidth: 1280,
-        minHeight: 1280,
-        quality: 82,
-      );
+      final nextImages = [...state.draft.galleryImages];
+      for (final image in selectedImages.take(remainingSlots)) {
+        final imageBytes = await image.readAsBytes();
+        final compressedBytes = await FlutterImageCompress.compressWithList(
+          imageBytes,
+          minWidth: 900,
+          minHeight: 900,
+          quality: 68,
+        );
+        nextImages.add(
+          BookImageModel(path: image.path, bytes: compressedBytes),
+        );
+      }
+      final normalizedDraft = _draftWithImages(state.draft, nextImages);
 
       emit(
         state.copyWith(
-          draft: state.draft.copyWith(
-            imagePath: image.path,
-            imageBytes: compressedBytes,
-          ),
+          draft: normalizedDraft,
           isProcessingImage: false,
-          message: 'Book image optimized and added successfully.',
+          message:
+              '${selectedImages.length} image${selectedImages.length == 1 ? '' : 's'} added successfully.',
         ),
       );
-    } catch (_) {
+      timer.success(
+        'Book images selected',
+        details: {'count': normalizedDraft.imageCount},
+      );
+    } catch (error, stackTrace) {
+      timer.fail(
+        'Image processing failed',
+        error: error,
+        stackTrace: stackTrace,
+      );
       emit(
         state.copyWith(
           isProcessingImage: false,
@@ -64,6 +140,23 @@ class BookCubit extends Cubit<BookState> {
         ),
       );
     }
+  }
+
+  void removeImageAt(int index) {
+    final currentImages = [...state.draft.galleryImages];
+    if (index < 0 || index >= currentImages.length) {
+      return;
+    }
+
+    currentImages.removeAt(index);
+    emit(
+      state.copyWith(
+        draft: _draftWithImages(state.draft, currentImages),
+        message: currentImages.isEmpty
+            ? 'All listing images removed.'
+            : 'Listing image removed.',
+      ),
+    );
   }
 
   void updateTitle(String value) {
@@ -148,17 +241,21 @@ class BookCubit extends Cubit<BookState> {
   }
 
   Future<void> saveListing() async {
+    final timer = AppLogger.startTimer(
+      'BookCubit',
+      state.isEditing ? 'updateListing' : 'publishListing',
+      details: {'bookId': state.editingBookId},
+    );
     final currentTabIndex = state.currentTabIndex;
     emit(state.copyWith(isSavingListing: true, message: null));
 
     try {
       if (state.isEditing) {
         await _repository.update(state.draft.copyWith(id: state.editingBookId));
-        final books = _repository.snapshot();
+        timer.success('Listing updated');
         emit(
           state.copyWith(
             currentTabIndex: currentTabIndex,
-            books: books,
             draft: const BookModel(),
             isLoadingBooks: false,
             isSavingListing: false,
@@ -171,11 +268,10 @@ class BookCubit extends Cubit<BookState> {
       }
 
       await _repository.publish(state.draft);
-      final books = _repository.snapshot();
+      timer.success('Listing published');
       emit(
         state.copyWith(
           currentTabIndex: currentTabIndex,
-          books: books,
           draft: const BookModel(),
           isLoadingBooks: false,
           isSavingListing: false,
@@ -184,7 +280,8 @@ class BookCubit extends Cubit<BookState> {
           message: 'Listing published successfully.',
         ),
       );
-    } catch (_) {
+    } catch (error, stackTrace) {
+      timer.fail('Listing save failed', error: error, stackTrace: stackTrace);
       emit(
         state.copyWith(
           isSavingListing: false,
@@ -195,18 +292,57 @@ class BookCubit extends Cubit<BookState> {
   }
 
   Future<void> deleteBook(String bookId) async {
-    await _repository.delete(bookId);
-    emit(
-      state.copyWith(
-        books: _repository.snapshot(),
-        draft: state.editingBookId == bookId ? const BookModel() : state.draft,
-        clearEditing: state.editingBookId == bookId,
-        message: 'Listing deleted successfully.',
-      ),
+    final timer = AppLogger.startTimer(
+      'BookCubit',
+      'deleteBook',
+      details: {'bookId': bookId},
     );
+    try {
+      await _repository.delete(bookId);
+      timer.success('Listing deleted');
+      emit(
+        state.copyWith(
+          books: _repository.snapshot(),
+          draft: state.editingBookId == bookId
+              ? const BookModel()
+              : state.draft,
+          clearEditing: state.editingBookId == bookId,
+          message: 'Listing deleted successfully.',
+        ),
+      );
+    } catch (error, stackTrace) {
+      timer.fail('Delete listing failed', error: error, stackTrace: stackTrace);
+      emit(state.copyWith(message: 'Could not delete the listing right now.'));
+    }
   }
 
   void clearMessage() {
     emit(state.copyWith(message: null));
+  }
+
+  @override
+  Future<void> close() async {
+    await _booksSubscription?.cancel();
+    return super.close();
+  }
+
+  BookModel _draftWithImages(BookModel draft, List<BookImageModel> images) {
+    final limitedImages = images
+        .take(BookModel.maxImages)
+        .toList(growable: false);
+    final primaryImage = limitedImages.isEmpty ? null : limitedImages.first;
+
+    return draft.copyWith(
+      imagePath: primaryImage?.path,
+      imageBytes: primaryImage?.bytes,
+      imageBase64: primaryImage?.base64,
+      imageUrl: primaryImage?.resolvedUrl,
+      images: limitedImages,
+      clearImagePath: limitedImages.isEmpty,
+      clearImageBytes: limitedImages.isEmpty,
+      clearImageBase64: limitedImages.isEmpty,
+      clearImageUrl: limitedImages.isEmpty,
+      clearImages: limitedImages.isEmpty,
+    );
   }
 }

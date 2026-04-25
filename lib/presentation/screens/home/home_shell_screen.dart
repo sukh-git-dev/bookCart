@@ -1,4 +1,5 @@
 import 'package:bookcart/core/constants/app_colors.dart';
+import 'package:bookcart/core/utils/app_animation_utils.dart';
 import 'package:bookcart/logic/cubits/book_cubit.dart';
 import 'package:bookcart/logic/cubits/book_state.dart';
 import 'package:bookcart/presentation/bottom_nav_bar.dart';
@@ -41,7 +42,7 @@ class HomeShellScreen extends StatelessWidget {
                       _DesktopSideRail(
                         currentIndex: state.currentTabIndex,
                         onTap: context.read<BookCubit>().changeTab,
-                      ),
+                      ).animatePage(),
                       Expanded(
                         child: Container(
                           color: AppColors.background,
@@ -49,11 +50,11 @@ class HomeShellScreen extends StatelessWidget {
                             child: ConstrainedBox(
                               constraints: const BoxConstraints(maxWidth: 1440),
                               child: AnimatedSwitcher(
-                                duration: const Duration(milliseconds: 250),
+                                duration: const Duration(milliseconds: 320),
                                 child: KeyedSubtree(
                                   key: ValueKey(state.currentTabIndex),
                                   child: activeScreen,
-                                ),
+                                ).animatePage(),
                               ),
                             ),
                           ),
@@ -62,11 +63,11 @@ class HomeShellScreen extends StatelessWidget {
                     ],
                   )
                 : AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 250),
+                    duration: const Duration(milliseconds: 320),
                     child: KeyedSubtree(
                       key: ValueKey(state.currentTabIndex),
                       child: activeScreen,
-                    ),
+                    ).animatePage(),
                   ),
           ),
           bottomNavigationBar: isDesktop
@@ -74,7 +75,7 @@ class HomeShellScreen extends StatelessWidget {
               : BookBottomNavBar(
                   currentIndex: state.currentTabIndex,
                   onTap: context.read<BookCubit>().changeTab,
-                ),
+                ).animatePage(delay: const Duration(milliseconds: 120)),
         );
       },
     );
@@ -182,7 +183,7 @@ class _DesktopSideRail extends StatelessWidget {
                     ],
                   ),
                 ),
-              ),
+              ).animateListItem(order: index),
             );
           }),
           const Spacer(),

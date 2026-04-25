@@ -72,5 +72,4 @@ class DefaultFirebaseOptions {
     storageBucket: 'bookcart-c7f2f.firebasestorage.app',
     iosBundleId: 'com.app.bookcart.bookcart',
   );
-
 }

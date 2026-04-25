@@ -1,4 +1,5 @@
 import 'package:bookcart/core/constants/app_colors.dart';
+import 'package:bookcart/core/utils/app_animation_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -69,7 +70,7 @@ class BookBottomNavBar extends StatelessWidget {
         ],
         onTap: onTap,
       ),
-    );
+    ).animatePage(delay: const Duration(milliseconds: 80));
   }
 }
 

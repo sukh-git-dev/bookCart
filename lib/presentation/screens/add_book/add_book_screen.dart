@@ -1,6 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:bookcart/core/constants/app_colors.dart';
 import 'package:bookcart/core/constants/app_strings.dart';
 import 'package:bookcart/core/constants/book_categories.dart';
+import 'package:bookcart/core/utils/app_animation_utils.dart';
 import 'package:bookcart/data/models/book_model.dart';
 import 'package:bookcart/logic/cubits/book_cubit.dart';
 import 'package:bookcart/logic/cubits/book_state.dart';
@@ -8,11 +11,7 @@ import 'package:bookcart/presentation/widgets/app_loading_indicator.dart';
 import 'package:bookcart/presentation/widgets/app_shimmer.dart';
 import 'package:bookcart/presentation/widgets/app_toast.dart';
 import 'package:bookcart/presentation/widgets/app_text_field.dart';
-import 'package:bookcart/presentation/widgets/info_chip.dart';
 import 'package:bookcart/presentation/widgets/section_title.dart';
-import 'package:bookcart/presentation/widgets/step_row.dart';
-import 'package:fl_chart/fl_chart.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -113,21 +112,26 @@ class _AddBookScreenState extends State<AddBookScreen> {
                               child: _AddBookLeadColumn(
                                 state: state,
                                 onImageTap: cubit.pickImage,
+                                onRemoveImage: cubit.removeImageAt,
                                 onStartCreate: cubit.startCreateListing,
                                 onViewAll: cubit.viewAllListings,
-                              ),
+                              ).animatePage(),
                             ),
                             SizedBox(width: 24.w),
                             Expanded(
                               flex: 6,
-                              child: _AddBookFormCard(
-                                state: state,
-                                cubit: cubit,
-                                titleController: _titleController,
-                                authorController: _authorController,
-                                priceController: _priceController,
-                                descriptionController: _descriptionController,
-                              ),
+                              child:
+                                  _AddBookFormCard(
+                                    state: state,
+                                    cubit: cubit,
+                                    titleController: _titleController,
+                                    authorController: _authorController,
+                                    priceController: _priceController,
+                                    descriptionController:
+                                        _descriptionController,
+                                  ).animatePage(
+                                    delay: const Duration(milliseconds: 120),
+                                  ),
                             ),
                           ],
                         )
@@ -137,9 +141,10 @@ class _AddBookScreenState extends State<AddBookScreen> {
                             _AddBookLeadColumn(
                               state: state,
                               onImageTap: cubit.pickImage,
+                              onRemoveImage: cubit.removeImageAt,
                               onStartCreate: cubit.startCreateListing,
                               onViewAll: cubit.viewAllListings,
-                            ),
+                            ).animatePage(),
                             SizedBox(height: 22.h),
                             _AddBookFormCard(
                               state: state,
@@ -148,6 +153,8 @@ class _AddBookScreenState extends State<AddBookScreen> {
                               authorController: _authorController,
                               priceController: _priceController,
                               descriptionController: _descriptionController,
+                            ).animatePage(
+                              delay: const Duration(milliseconds: 120),
                             ),
                           ],
                         ),
@@ -165,64 +172,66 @@ class _AddBookLeadColumn extends StatelessWidget {
   const _AddBookLeadColumn({
     required this.state,
     required this.onImageTap,
+    required this.onRemoveImage,
     required this.onStartCreate,
     required this.onViewAll,
   });
 
   final BookState state;
   final VoidCallback onImageTap;
+  final ValueChanged<int> onRemoveImage;
   final VoidCallback onStartCreate;
   final VoidCallback onViewAll;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
+    return AppStaggeredColumn(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         _HeroSellCard(state: state),
         SizedBox(height: 22.h),
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(18.w),
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            borderRadius: BorderRadius.circular(24.r),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: _LeadStat(
-                  label: 'Status',
-                  value: state.isEditing
-                      ? 'Editing'
-                      : state.draft.imagePath == null
-                      ? 'Draft'
-                      : 'Ready',
-                ),
-              ),
-              Container(width: 1, height: 38.h, color: AppColors.border),
-              Expanded(
-                child: _LeadStat(
-                  label: 'Image',
-                  value: state.isProcessingImage
-                      ? 'Compressing'
-                      : state.draft.imagePath == null
-                      ? 'Pending'
-                      : 'Added',
-                ),
-              ),
-              Container(width: 1, height: 38.h, color: AppColors.border),
-              Expanded(
-                child: _LeadStat(
-                  label: 'Listings',
-                  value: '${state.books.length}',
-                ),
-              ),
-            ],
-          ),
-        ),
-        SizedBox(height: 20.h),
+        // Container(
+        //   width: double.infinity,
+        //   padding: EdgeInsets.all(18.w),
+        //   decoration: BoxDecoration(
+        //     color: AppColors.white,
+        //     borderRadius: BorderRadius.circular(24.r),
+        //     border: Border.all(color: AppColors.border),
+        //   ),
+        //   child: Row(
+        //     children: [
+        //       Expanded(
+        //         child: _LeadStat(
+        //           label: 'Status',
+        //           value: state.isEditing
+        //               ? 'Editing'
+        //               : state.draft.imagePath == null
+        //               ? 'Draft'
+        //               : 'Ready',
+        //         ),
+        //       ),
+        //       Container(width: 1, height: 38.h, color: AppColors.border),
+        //       Expanded(
+        //         child: _LeadStat(
+        //           label: 'Image',
+        //           value: state.isProcessingImage
+        //               ? 'Compressing'
+        //               : state.draft.imagePath == null
+        //               ? 'Pending'
+        //               : 'Added',
+        //         ),
+        //       ),
+        //       Container(width: 1, height: 38.h, color: AppColors.border),
+        //       Expanded(
+        //         child: _LeadStat(
+        //           label: 'Listings',
+        //           value: '${state.books.length}',
+        //         ),
+        //       ),
+        //     ],
+        //   ),
+        // ),
+        // SizedBox(height: 20.h),
         Text(
           AppStrings.sellTitle,
           style: TextStyle(
@@ -241,36 +250,35 @@ class _AddBookLeadColumn extends StatelessWidget {
           ),
         ),
         SizedBox(height: 22.h),
-        GestureDetector(
-          onTap: onImageTap,
-          child: _ImagePickerCard(state: state),
-        ),
+        _ImagePickerCard(state: state, onAddImages: onImageTap),
+        if (state.draft.hasImages) ...[
+          SizedBox(height: 12.h),
+          _SelectedImageStrip(
+            images: state.draft.galleryImages,
+            onRemoveImage: onRemoveImage,
+          ),
+        ],
         SizedBox(height: 18.h),
-        Row(
-          children: [
-            Expanded(
-              child: InfoChip(
-                icon: Icons.add_photo_alternate_rounded,
-                label: state.draft.imagePath == null
-                    ? 'Select image to start listing'
-                    : 'Book image selected',
-              ),
-            ),
-            SizedBox(width: 12.w),
-            const Expanded(
-              child: InfoChip(
-                icon: Icons.verified_rounded,
-                label: 'Onboarding + sell flow ready',
-              ),
-            ),
-          ],
-        ),
-        SizedBox(height: 18.h),
-        _SellInsightsCard(
-          books: state.books,
-          draftPrice: state.draft.priceValue,
-        ),
-        SizedBox(height: 18.h),
+        // Row(
+        //   children: [
+        //     Expanded(
+        //       child: InfoChip(
+        //         icon: Icons.add_photo_alternate_rounded,
+        //         label: state.draft.imagePath == null
+        //             ? 'Select image to start listing'
+        //             : 'Book image selected',
+        //       ),
+        //     ),
+        //     SizedBox(width: 12.w),
+        //     const Expanded(
+        //       child: InfoChip(
+        //         icon: Icons.verified_rounded,
+        //         label: 'Onboarding + sell flow ready',
+        //       ),
+        //     ),
+        //   ],
+        // ),
+        // SizedBox(height: 18.h),
         Row(
           children: [
             Expanded(
@@ -341,7 +349,7 @@ class _AddBookFormCard extends StatelessWidget {
           ),
         ],
       ),
-      child: Column(
+      child: AppStaggeredColumn(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
@@ -400,7 +408,7 @@ class _AddBookFormCard extends StatelessWidget {
           AppTextField(
             controller: priceController,
             label: 'Selling Price',
-            hint: '299',
+            hint: 'Enter book price',
             keyboardType: TextInputType.number,
             prefixIcon: Icons.currency_rupee_rounded,
             onChanged: cubit.updatePrice,
@@ -410,44 +418,43 @@ class _AddBookFormCard extends StatelessWidget {
             controller: descriptionController,
             label: 'Description',
             hint: 'Brief condition, highlights, notes, and delivery details.',
-            maxLines: 5,
+            minLines: 3,
+            maxLines: null,
+            keyboardType: TextInputType.multiline,
             prefixIcon: Icons.notes_rounded,
             onChanged: cubit.updateDescription,
           ),
-          SizedBox(height: 20.h),
-          Container(
-            width: double.infinity,
-            padding: EdgeInsets.all(16.w),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(24.r),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const SectionTitle(title: 'Quick Steps'),
-                SizedBox(height: 12.h),
-                const StepRow(
-                  step: '1',
-                  text: 'Tap image and select a cover photo.',
-                ),
-                const StepRow(
-                  step: '2',
-                  text:
-                      'Add title, author, price, description, and categories.',
-                ),
-                const StepRow(
-                  step: '3',
-                  text: 'Review price trend and preview.',
-                ),
-                const StepRow(step: '4', text: 'Edit or reset when needed.'),
-                const StepRow(
-                  step: '5',
-                  text: 'Save the listing and view all inventory.',
-                ),
-              ],
-            ),
-          ),
+          // SizedBox(height: 20.h),
+          // Container(
+          //   width: double.infinity,
+          //   padding: EdgeInsets.all(16.w),
+          //   decoration: BoxDecoration(
+          //     color: AppColors.surface,
+          //     borderRadius: BorderRadius.circular(24.r),
+          //   ),
+          //   child: Column(
+          //     crossAxisAlignment: CrossAxisAlignment.start,
+          //     children: [
+          //       const SectionTitle(title: 'Quick Steps'),
+          //       SizedBox(height: 12.h),
+          //       const StepRow(
+          //         step: '1',
+          //         text: 'Tap image and select a cover photo.',
+          //       ),
+          //       const StepRow(
+          //         step: '2',
+          //         text:
+          //             'Add title, author, price, description, and categories.',
+          //       ),
+          //       const StepRow(step: '3', text: 'Review the listing preview.'),
+          //       const StepRow(step: '4', text: 'Edit or reset when needed.'),
+          //       const StepRow(
+          //         step: '5',
+          //         text: 'Save the listing and view all inventory.',
+          //       ),
+          //     ],
+          //   ),
+          // ),
           SizedBox(height: 18.h),
           Container(
             width: double.infinity,
@@ -482,7 +489,7 @@ class _AddBookFormCard extends StatelessWidget {
                             : state.draft.title,
                         style: TextStyle(
                           color: Colors.white,
-                          fontSize: 15.sp,
+                          fontSize: 13.sp,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -522,7 +529,7 @@ class _AddBookFormCard extends StatelessWidget {
                   label: Text(
                     primaryActionLabel,
                     style: TextStyle(
-                      fontSize: 16.sp,
+                      fontSize: 14.sp,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
@@ -536,22 +543,22 @@ class _AddBookFormCard extends StatelessWidget {
                   ),
                 ),
               ),
-              SizedBox(width: 12.w),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: cubit.viewAllListings,
-                  icon: const Icon(Icons.visibility_rounded),
-                  label: const Text('View All Listings'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.dark,
-                    minimumSize: Size(double.infinity, 50.h),
-                    side: BorderSide(color: AppColors.border),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(20.r),
-                    ),
-                  ),
-                ),
-              ),
+              // SizedBox(width: 12.w),
+              // Expanded(
+              //   child: OutlinedButton.icon(
+              //     onPressed: cubit.viewAllListings,
+              //     icon: const Icon(Icons.visibility_rounded),
+              //     label: const Text('View All Listings'),
+              //     style: OutlinedButton.styleFrom(
+              //       foregroundColor: AppColors.dark,
+              //       minimumSize: Size(double.infinity, 50.h),
+              //       side: BorderSide(color: AppColors.border),
+              //       shape: RoundedRectangleBorder(
+              //         borderRadius: BorderRadius.circular(20.r),
+              //       ),
+              //     ),
+              //   ),
+              // ),
             ],
           ),
         ],
@@ -635,17 +642,17 @@ class _CategorySelectorSection extends StatelessWidget {
                 ),
             ],
           ),
-          if (selectedCategories.isNotEmpty) ...[
-            SizedBox(height: 14.h),
-            Text(
-              'Selected: ${selectedCategories.join(', ')}',
-              style: TextStyle(
-                fontSize: 12.sp,
-                fontWeight: FontWeight.w700,
-                color: AppColors.dark,
-              ),
-            ),
-          ],
+          // if (selectedCategories.isNotEmpty) ...[
+          //   SizedBox(height: 14.h),
+          //   Text(
+          //     'Selected: ${selectedCategories.join(', ')}',
+          //     style: TextStyle(
+          //       fontSize: 12.sp,
+          //       fontWeight: FontWeight.w700,
+          //       color: AppColors.dark,
+          //     ),
+          //   ),
+          // ],
         ],
       ),
     );
@@ -757,7 +764,7 @@ class _HeroSellCard extends StatelessWidget {
                 Text(
                   state.isEditing
                       ? 'Tune the details and refresh your listing fast.'
-                      : state.draft.imagePath == null
+                      : state.draft.imageCount == 0
                       ? 'Create a polished book listing in minutes.'
                       : 'Your listing is almost ready to go live.',
                   style: TextStyle(
@@ -769,7 +776,7 @@ class _HeroSellCard extends StatelessWidget {
                 ),
                 SizedBox(height: 10.h),
                 Text(
-                  'Add one clear image, track price movement, and keep your inventory updated from one place.',
+                  'Add up to ${BookModel.maxImages} clear images and keep your inventory updated from one place.',
                   style: TextStyle(
                     color: AppColors.white.withValues(alpha: 0.82),
                     fontSize: 13.sp,
@@ -801,357 +808,175 @@ class _HeroSellCard extends StatelessWidget {
 }
 
 class _ImagePickerCard extends StatelessWidget {
-  const _ImagePickerCard({required this.state});
+  const _ImagePickerCard({required this.state, required this.onAddImages});
 
   final BookState state;
+  final VoidCallback onAddImages;
 
   @override
   Widget build(BuildContext context) {
-    final hasImage = state.draft.imageBytes != null;
+    final hasImage = state.draft.hasImages;
+    final previewBytes = state.draft.resolvedImageBytes;
+    final previewUrl = state.draft.primaryImageUrl;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 220),
-      height: 260.h,
-      width: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(28.r),
-        border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.18),
-          width: 1.4,
+    return InkWell(
+      borderRadius: BorderRadius.circular(28.r),
+      onTap: state.isProcessingImage ? null : onAddImages,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 220),
+        height: 280.h,
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(28.r),
+          border: Border.all(
+            color: AppColors.primary.withValues(alpha: 0.18),
+            width: 1.4,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.04),
+              blurRadius: 18,
+              offset: const Offset(0, 8),
+            ),
+          ],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Stack(
-        children: [
-          Positioned.fill(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(28.r),
-              child: hasImage
-                  ? _SelectedImageView(imageBytes: state.draft.imageBytes!)
-                  : const _ImagePickerPlaceholder(),
-            ),
-          ),
-          if (state.isProcessingImage)
+        child: Stack(
+          children: [
             Positioned.fill(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28.r),
+                child: hasImage
+                    ? _SelectedImageView(
+                        imageBytes: previewBytes,
+                        imageUrl: previewUrl,
+                      )
+                    : const _ImagePickerPlaceholder(),
+              ),
+            ),
+            if (state.isProcessingImage)
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.82),
+                    borderRadius: BorderRadius.circular(28.r),
+                  ),
+                  child: const Center(
+                    child: AppLoadingIndicator(label: 'Compressing image...'),
+                  ),
+                ),
+              ),
+            Positioned(
+              right: 16.w,
+              top: 16.h,
               child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.82),
-                  borderRadius: BorderRadius.circular(28.r),
+                  color: AppColors.dark.withValues(alpha: 0.78),
+                  borderRadius: BorderRadius.circular(18.r),
                 ),
-                child: const Center(
-                  child: AppLoadingIndicator(label: 'Compressing image...'),
-                ),
-              ),
-            ),
-          Positioned(
-            right: 14.w,
-            top: 14.h,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-              decoration: BoxDecoration(
-                color: AppColors.dark.withValues(alpha: 0.8),
-                borderRadius: BorderRadius.circular(18.r),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    Icons.photo_library_rounded,
-                    color: AppColors.white,
-                    size: 16.sp,
-                  ),
-                  SizedBox(width: 6.w),
-                  Text(
-                    state.isProcessingImage
-                        ? 'Optimizing'
-                        : hasImage
-                        ? 'Image Ready'
-                        : 'Add Image',
-                    style: TextStyle(
-                      color: AppColors.white,
-                      fontSize: 12.sp,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          Positioned(
-            left: 16.w,
-            bottom: 16.h,
-            child: Container(
-              padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
-              decoration: BoxDecoration(
-                color: AppColors.white.withValues(alpha: 0.92),
-                borderRadius: BorderRadius.circular(18.r),
-              ),
-              child: Text(
-                state.isProcessingImage
-                    ? 'Please wait while the image is compressed'
-                    : hasImage
-                    ? 'Tap to replace image'
-                    : 'Tap to add book image',
-                style: TextStyle(
-                  fontSize: 13.sp,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.dark,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SellInsightsCard extends StatelessWidget {
-  const _SellInsightsCard({required this.books, required this.draftPrice});
-
-  final List<BookModel> books;
-  final double draftPrice;
-
-  @override
-  Widget build(BuildContext context) {
-    final recentBooks = books.take(6).toList().reversed.toList();
-    final chartBooks = recentBooks.isEmpty
-        ? [const BookModel(price: '0')]
-        : recentBooks;
-    final averagePrice = books.isEmpty
-        ? 0.0
-        : books.fold<double>(0, (sum, book) => sum + book.priceValue) /
-              books.length;
-    final highestPrice = books.fold<double>(
-      0,
-      (maxValue, book) =>
-          book.priceValue > maxValue ? book.priceValue : maxValue,
-    );
-
-    return Container(
-      width: double.infinity,
-      padding: EdgeInsets.all(18.w),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(24.r),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 16,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
                 child: Text(
-                  'Sell Price Trend',
+                  '${state.draft.imageCount}/${BookModel.maxImages}',
                   style: TextStyle(
-                    fontSize: 17.sp,
-                    fontWeight: FontWeight.w800,
+                    color: AppColors.white,
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              left: 16.w,
+              bottom: 16.h,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 10.h),
+                decoration: BoxDecoration(
+                  color: AppColors.white.withValues(alpha: 0.92),
+                  borderRadius: BorderRadius.circular(18.r),
+                ),
+                child: Text(
+                  state.isProcessingImage
+                      ? 'Please wait while the images are compressed'
+                      : hasImage
+                      ? state.draft.imageCount < BookModel.maxImages
+                            ? 'Tap to add more images'
+                            : 'Maximum ${BookModel.maxImages} images selected'
+                      : 'Tap to add up to ${BookModel.maxImages} book images',
+                  style: TextStyle(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w700,
                     color: AppColors.dark,
                   ),
                 ),
               ),
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 7.h),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(16.r),
-                ),
-                child: Text(
-                  draftPrice > 0
-                      ? 'Draft: ₹${draftPrice.toStringAsFixed(0)}'
-                      : 'Draft pending',
-                  style: TextStyle(
-                    fontSize: 12.sp,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-            ],
-          ),
-          SizedBox(height: 8.h),
-          Text(
-            'See how your latest listing prices move before you publish the next one.',
-            style: TextStyle(
-              fontSize: 13.sp,
-              height: 1.45,
-              color: AppColors.muted,
             ),
-          ),
-          SizedBox(height: 18.h),
-          SizedBox(
-            height: 190.h,
-            child: LineChart(
-              LineChartData(
-                minY: 0,
-                gridData: FlGridData(
-                  show: true,
-                  drawVerticalLine: false,
-                  horizontalInterval: 100,
-                  getDrawingHorizontalLine: (value) =>
-                      FlLine(color: AppColors.border, strokeWidth: 1),
-                ),
-                titlesData: FlTitlesData(
-                  leftTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      reservedSize: 42.w,
-                      interval: 100,
-                      getTitlesWidget: (value, meta) => Text(
-                        '₹${value.toInt()}',
-                        style: TextStyle(
-                          fontSize: 10.sp,
-                          color: AppColors.muted,
-                        ),
-                      ),
-                    ),
-                  ),
-                  rightTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  topTitles: const AxisTitles(
-                    sideTitles: SideTitles(showTitles: false),
-                  ),
-                  bottomTitles: AxisTitles(
-                    sideTitles: SideTitles(
-                      showTitles: true,
-                      getTitlesWidget: (value, meta) {
-                        final index = value.toInt();
-                        if (index < 0 || index >= chartBooks.length) {
-                          return const SizedBox.shrink();
-                        }
-
-                        return Padding(
-                          padding: EdgeInsets.only(top: 8.h),
-                          child: Text(
-                            'B${index + 1}',
-                            style: TextStyle(
-                              fontSize: 10.sp,
-                              color: AppColors.muted,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-                borderData: FlBorderData(show: false),
-                lineBarsData: [
-                  LineChartBarData(
-                    isCurved: true,
-                    barWidth: 3.2,
-                    color: AppColors.primary,
-                    spots: [
-                      for (int index = 0; index < chartBooks.length; index++)
-                        FlSpot(index.toDouble(), chartBooks[index].priceValue),
-                    ],
-                    dotData: FlDotData(
-                      show: true,
-                      getDotPainter: (spot, percent, bar, index) =>
-                          FlDotCirclePainter(
-                            radius: 4.2,
-                            color: AppColors.white,
-                            strokeWidth: 2.2,
-                            strokeColor: AppColors.primary,
-                          ),
-                    ),
-                    belowBarData: BarAreaData(
-                      show: true,
-                      gradient: LinearGradient(
-                        colors: [
-                          AppColors.primary.withValues(alpha: 0.24),
-                          AppColors.primary.withValues(alpha: 0.04),
-                        ],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          SizedBox(height: 16.h),
-          Row(
-            children: [
-              Expanded(
-                child: _InsightStat(
-                  label: 'Average',
-                  value: '₹${averagePrice.toStringAsFixed(0)}',
-                ),
-              ),
-              SizedBox(width: 12.w),
-              Expanded(
-                child: _InsightStat(
-                  label: 'Highest',
-                  value: '₹${highestPrice.toStringAsFixed(0)}',
-                ),
-              ),
-              SizedBox(width: 12.w),
-              Expanded(
-                child: _InsightStat(
-                  label: 'Listings',
-                  value: '${books.length}',
-                ),
-              ),
-            ],
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
 
-class _InsightStat extends StatelessWidget {
-  const _InsightStat({required this.label, required this.value});
+class _SelectedImageStrip extends StatelessWidget {
+  const _SelectedImageStrip({
+    required this.images,
+    required this.onRemoveImage,
+  });
 
-  final String label;
-  final String value;
+  final List<BookImageModel> images;
+  final ValueChanged<int> onRemoveImage;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: EdgeInsets.all(14.w),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(18.r),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11.sp,
-              fontWeight: FontWeight.w700,
-              color: AppColors.muted,
-            ),
-          ),
-          SizedBox(height: 6.h),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w800,
-              color: AppColors.dark,
-            ),
-          ),
-        ],
+    return SizedBox(
+      height: 92.h,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        itemCount: images.length,
+        separatorBuilder: (_, __) => SizedBox(width: 10.w),
+        itemBuilder: (context, index) {
+          final image = images[index];
+          return Stack(
+            children: [
+              Container(
+                width: 96.w,
+                decoration: BoxDecoration(
+                  color: AppColors.white,
+                  borderRadius: BorderRadius.circular(22.r),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(22.r),
+                  child: _SelectedImageView(
+                    imageBytes: image.resolvedBytes,
+                    imageUrl: image.resolvedUrl,
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 6.w,
+                top: 6.h,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.58),
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    onPressed: () => onRemoveImage(index),
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: Colors.white,
+                      size: 16.sp,
+                    ),
+                    constraints: BoxConstraints.tight(Size(30.w, 30.w)),
+                    padding: EdgeInsets.zero,
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -1179,55 +1004,32 @@ class _AddBookLoadingView extends StatelessWidget {
   }
 }
 
-class _LeadStat extends StatelessWidget {
-  const _LeadStat({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 12.w),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11.sp,
-              fontWeight: FontWeight.w700,
-              color: AppColors.muted,
-            ),
-          ),
-          SizedBox(height: 4.h),
-          Text(
-            value,
-            style: TextStyle(
-              fontSize: 14.sp,
-              fontWeight: FontWeight.w800,
-              color: AppColors.dark,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _SelectedImageView extends StatelessWidget {
-  const _SelectedImageView({required this.imageBytes});
+  const _SelectedImageView({this.imageBytes, this.imageUrl});
 
-  final Uint8List imageBytes;
+  final Uint8List? imageBytes;
+  final String? imageUrl;
 
   @override
   Widget build(BuildContext context) {
     const fallback = _ImagePickerPlaceholder();
-    return Image.memory(
-      imageBytes,
-      fit: BoxFit.cover,
-      errorBuilder: (_, __, ___) => fallback,
-    );
+    if (imageBytes != null) {
+      return Image.memory(
+        imageBytes!,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => fallback,
+      );
+    }
+
+    if (imageUrl != null && imageUrl!.isNotEmpty) {
+      return Image.network(
+        imageUrl!,
+        fit: BoxFit.cover,
+        errorBuilder: (_, __, ___) => fallback,
+      );
+    }
+
+    return fallback;
   }
 }
 
@@ -1266,7 +1068,7 @@ class _ImagePickerPlaceholder extends StatelessWidget {
               ),
               SizedBox(height: 14.h),
               Text(
-                'Select cover photo',
+                'Select book images',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 18.sp,
@@ -1276,7 +1078,7 @@ class _ImagePickerPlaceholder extends StatelessWidget {
               ),
               SizedBox(height: 8.h),
               Text(
-                'Choose an image first, then enter the listing details manually.',
+                'Choose up to ${BookModel.maxImages} images first, then enter the listing details manually.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13.sp,

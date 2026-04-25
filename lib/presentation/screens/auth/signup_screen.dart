@@ -2,11 +2,19 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:bookcart/core/constants/app_colors.dart';
+import 'package:bookcart/core/utils/app_animation_utils.dart';
+import 'package:bookcart/core/utils/location_label_utils.dart';
+import 'package:bookcart/core/utils/location_time_utils.dart';
+import 'package:bookcart/data/models/user_model.dart';
+import 'package:bookcart/data/repository/biometric_auth_repository.dart';
+import 'package:bookcart/data/repository/device_location_repository.dart';
 import 'package:bookcart/logic/cubits/auth_cubit.dart';
 import 'package:bookcart/logic/cubits/auth_state.dart';
 import 'package:bookcart/presentation/screens/auth/login_screen.dart';
 import 'package:bookcart/presentation/screens/home/home_shell_screen.dart';
 import 'package:bookcart/presentation/widgets/app_toast.dart';
+import 'package:bookcart/presentation/widgets/auth_text_field.dart';
+import 'package:bookcart/presentation/widgets/current_location_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -26,9 +34,42 @@ class _SignUpScreenState extends State<SignUpScreen> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  final TextEditingController _confirmPasswordController =
+      TextEditingController();
+  final TextEditingController _locationController = TextEditingController(
+    text: UserModel.defaultLocation,
+  );
+  bool _hidePassword = true;
+  bool _hideConfirmPassword = true;
   final ImagePicker _picker = ImagePicker();
   Uint8List? _profileImageBytes;
   String? _profileImageBase64;
+  bool _loadedBiometricStatus = false;
+  bool _biometricAvailable = false;
+  bool _enableBiometricLogin = false;
+  String _biometricLabel = 'Face ID';
+  DateTime? _locationUpdatedAt;
+  double? _latitude;
+  double? _longitude;
+  bool _isFetchingLocation = false;
+  @override
+  void initState() {
+    super.initState();
+
+    _nameController.text = "Sukhveer Singh";
+    _phoneController.text = "9465056434";
+    _emailController.text = "sukhveersin71@gmail.com";
+    _passwordController.text = "Hi@12345";
+    _confirmPasswordController.text = "Hi@12345";
+  }
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_loadedBiometricStatus) {
+      _loadedBiometricStatus = true;
+      _loadBiometricStatus();
+    }
+  }
 
   @override
   void dispose() {
@@ -36,17 +77,35 @@ class _SignUpScreenState extends State<SignUpScreen> {
     _phoneController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _locationController.dispose();
     super.dispose();
   }
 
   Future<void> _createAccount() async {
+    final name = _nameController.text.trim();
     final phone = _phoneController.text.trim();
     final email = _emailController.text.trim();
+    final location = _locationController.text.trim();
     final password = _passwordController.text;
-    if (phone.isEmpty || email.isEmpty || password.isEmpty) {
+    final confirmPassword = _confirmPasswordController.text;
+    if (name.isEmpty ||
+        phone.isEmpty ||
+        email.isEmpty ||
+        location.isEmpty ||
+        password.isEmpty) {
       AppToast.show(
         context,
-        message: 'Phone number, email, and password are required.',
+        message:
+            'Username, phone number, email, location, and password are required.',
+        type: AppToastType.error,
+      );
+      return;
+    }
+    if (password != confirmPassword) {
+      AppToast.show(
+        context,
+        message: 'Password and confirm password must match.',
         type: AppToastType.error,
       );
       return;
@@ -54,12 +113,33 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
     FocusScope.of(context).unfocus();
     await context.read<AuthCubit>().signUp(
-      name: _nameController.text.trim(),
+      name: name,
       phone: phone,
       email: email,
       password: password,
+      location: location,
+      latitude: _latitude,
+      longitude: _longitude,
+      locationUpdatedAt: _locationUpdatedAt,
       profileImageBase64: _profileImageBase64,
+      enableBiometricLogin: _biometricAvailable && _enableBiometricLogin,
+      disableBiometricLogin: _biometricAvailable && !_enableBiometricLogin,
     );
+  }
+
+  Future<void> _loadBiometricStatus() async {
+    final biometricRepository = context.read<BiometricAuthRepository>();
+    final canUseBiometrics = await biometricRepository.canUseBiometrics();
+    final label = await biometricRepository.preferredBiometricLabel();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _biometricAvailable = canUseBiometrics;
+      _biometricLabel = label;
+    });
   }
 
   Future<void> _pickProfileImage() async {
@@ -79,12 +159,62 @@ class _SignUpScreenState extends State<SignUpScreen> {
     });
   }
 
+  Future<void> _syncCurrentLocation() async {
+    if (_isFetchingLocation) {
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isFetchingLocation = true;
+    });
+
+    try {
+      final snapshot = await context
+          .read<DeviceLocationRepository>()
+          .getCurrentLocation();
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _locationController.text = visibleLocationLabel(
+          snapshot.label,
+          fallback: UserModel.defaultLocation,
+        );
+        _latitude = snapshot.latitude;
+        _longitude = snapshot.longitude;
+        _locationUpdatedAt = snapshot.capturedAt;
+      });
+
+      AppToast.show(
+        context,
+        message:
+            'Current location captured. ${formatLocationRefreshTime(snapshot.capturedAt)}.',
+        type: AppToastType.success,
+      );
+    } on DeviceLocationException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      AppToast.show(context, message: error.message, type: AppToastType.error);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isFetchingLocation = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocListener<AuthCubit, AuthState>(
       listenWhen: (previous, current) =>
           previous.status != current.status ||
-          previous.errorMessage != current.errorMessage,
+          previous.errorMessage != current.errorMessage ||
+          previous.successMessage != current.successMessage,
       listener: (context, state) {
         if (state.errorMessage != null) {
           AppToast.show(
@@ -93,7 +223,18 @@ class _SignUpScreenState extends State<SignUpScreen> {
             type: AppToastType.error,
           );
           context.read<AuthCubit>().clearFeedback();
+          _loadBiometricStatus();
           return;
+        }
+
+        if (state.successMessage != null &&
+            state.status != AuthStatus.authenticated) {
+          AppToast.show(
+            context,
+            message: state.successMessage!,
+            type: AppToastType.success,
+          );
+          context.read<AuthCubit>().clearFeedback();
         }
 
         if (state.status == AuthStatus.authenticated) {
@@ -114,12 +255,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
             body: SafeArea(
               child: SingleChildScrollView(
                 padding: EdgeInsets.all(20.w),
+                keyboardDismissBehavior:
+                    ScrollViewKeyboardDismissBehavior.onDrag,
                 child: Center(
                   child: ConstrainedBox(
                     constraints: const BoxConstraints(maxWidth: 620),
                     child: Column(
                       children: [
-                        const _SignUpHeroCard(),
+                        const _SignUpHeroCard().animatePage(),
                         SizedBox(height: 20.h),
                         Container(
                           padding: EdgeInsets.all(24.w),
@@ -134,7 +277,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               ),
                             ],
                           ),
-                          child: Column(
+                          child: AppStaggeredColumn(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
@@ -147,7 +290,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               ),
                               SizedBox(height: 8.h),
                               Text(
-                                'Create your account with phone number, email, and password.',
+                                'Create your account with username, phone, email, location, and password.',
                                 style: TextStyle(
                                   fontSize: 14.sp,
                                   height: 1.45,
@@ -198,22 +341,23 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 ),
                               ),
                               SizedBox(height: 18.h),
-                              _SignUpTextField(
+                              AuthTextField(
                                 controller: _nameController,
-                                label: 'Full Name',
-                                hint: 'Enter full name',
+                                label: 'User Name',
+                                hint: 'Enter user name',
                                 icon: Icons.person_rounded,
                               ),
                               SizedBox(height: 14.h),
-                              _SignUpTextField(
+                              AuthTextField(
                                 controller: _phoneController,
                                 label: 'Phone Number',
                                 hint: 'Enter phone number',
+                                maxLength: 10,
                                 icon: Icons.call_rounded,
                                 keyboardType: TextInputType.phone,
                               ),
                               SizedBox(height: 14.h),
-                              _SignUpTextField(
+                              AuthTextField(
                                 controller: _emailController,
                                 label: 'Email',
                                 hint: 'Enter email',
@@ -221,13 +365,88 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 keyboardType: TextInputType.emailAddress,
                               ),
                               SizedBox(height: 14.h),
-                              _SignUpTextField(
+                              AuthTextField(
+                                controller: _locationController,
+                                label: 'Location',
+                                hint: 'Enter city or area',
+                                icon: Icons.place_rounded,
+                                keyboardType: TextInputType.streetAddress,
+                              ),
+                              SizedBox(height: 14.h),
+                              AuthTextField(
                                 controller: _passwordController,
                                 label: 'Password',
                                 hint: 'Create password',
                                 icon: Icons.lock_rounded,
-                                obscureText: true,
+                                obscureText: _hidePassword,
+                                suffixIcon: IconButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _hidePassword = !_hidePassword;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    _hidePassword
+                                        ? Icons.visibility_rounded
+                                        : Icons.visibility_off_rounded,
+                                  ),
+                                ),
                               ),
+                              SizedBox(height: 14.h),
+                              AuthTextField(
+                                controller: _confirmPasswordController,
+                                label: 'Confirm Password',
+                                hint: 'Confirm password',
+                                icon: Icons.lock_rounded,
+                                obscureText: _hideConfirmPassword,
+                                suffixIcon: IconButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _hideConfirmPassword =
+                                          !_hideConfirmPassword;
+                                    });
+                                  },
+                                  icon: Icon(
+                                    _hideConfirmPassword
+                                        ? Icons.visibility_rounded
+                                        : Icons.visibility_off_rounded,
+                                  ),
+                                ),
+                              ),
+                              SizedBox(height: 14.h),
+                              CurrentLocationCard(
+                                title: 'Use current location',
+                                locationLabel: visibleLocationLabel(
+                                  _locationController.text.trim(),
+                                  fallback: UserModel.defaultLocation,
+                                ),
+                                statusLabel: _locationUpdatedAt == null
+                                    ? 'You can type your location manually or fill it from your device.'
+                                    : formatLocationRefreshTime(
+                                        _locationUpdatedAt,
+                                      ),
+                                isLoading: _isFetchingLocation,
+                                onPressed: isSubmitting
+                                    ? null
+                                    : _syncCurrentLocation,
+                                buttonLabel: 'Use Current Location',
+                              ),
+                              if (_biometricAvailable) ...[
+                                SizedBox(height: 14.h),
+                                _BiometricPreferenceTile(
+                                  title: 'Enable $_biometricLabel login',
+                                  subtitle:
+                                      'Use this device biometric check after signup.',
+                                  value: _enableBiometricLogin,
+                                  onChanged: isSubmitting
+                                      ? null
+                                      : (value) {
+                                          setState(() {
+                                            _enableBiometricLogin = value;
+                                          });
+                                        },
+                                ),
+                              ],
                               SizedBox(height: 22.h),
                               SizedBox(
                                 width: double.infinity,
@@ -269,7 +488,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               ),
                             ],
                           ),
-                        ),
+                        ).animatePage(delay: const Duration(milliseconds: 120)),
                       ],
                     ),
                   ),
@@ -333,61 +552,76 @@ class _SignUpHeroCard extends StatelessWidget {
   }
 }
 
-class _SignUpTextField extends StatelessWidget {
-  const _SignUpTextField({
-    required this.controller,
-    required this.label,
-    required this.hint,
-    required this.icon,
-    this.obscureText = false,
-    this.keyboardType,
+class _BiometricPreferenceTile extends StatelessWidget {
+  const _BiometricPreferenceTile({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
   });
 
-  final TextEditingController controller;
-  final String label;
-  final String hint;
-  final IconData icon;
-  final bool obscureText;
-  final TextInputType? keyboardType;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13.sp,
-            fontWeight: FontWeight.w700,
-            color: AppColors.dark,
+    return Container(
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20.r),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42.w,
+            height: 42.w,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(16.r),
+            ),
+            child: Icon(
+              Icons.face_retouching_natural_rounded,
+              color: AppColors.primary,
+              size: 22.sp,
+            ),
           ),
-        ),
-        SizedBox(height: 8.h),
-        TextField(
-          controller: controller,
-          obscureText: obscureText,
-          keyboardType: keyboardType,
-          style: TextStyle(color: AppColors.dark, fontSize: 14.sp),
-          decoration: InputDecoration(hintText: hint, prefixIcon: Icon(icon))
-              .applyDefaults(Theme.of(context).inputDecorationTheme)
-              .copyWith(
-                fillColor: AppColors.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20.r),
-                  borderSide: BorderSide.none,
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.dark,
+                  ),
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20.r),
-                  borderSide: BorderSide(color: AppColors.border),
+                SizedBox(height: 4.h),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    height: 1.35,
+                    color: AppColors.muted,
+                  ),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20.r),
-                  borderSide: BorderSide(color: AppColors.primary, width: 1.4),
-                ),
-              ),
-        ),
-      ],
+              ],
+            ),
+          ),
+          Switch.adaptive(
+            value: value,
+            activeThumbColor: AppColors.primary,
+            activeTrackColor: AppColors.primary.withValues(alpha: 0.25),
+            onChanged: onChanged,
+          ),
+        ],
+      ),
     );
   }
 }

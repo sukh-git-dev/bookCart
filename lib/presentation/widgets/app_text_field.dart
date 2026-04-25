@@ -10,6 +10,7 @@ class AppTextField extends StatelessWidget {
     required this.hint,
     required this.prefixIcon,
     required this.onChanged,
+    this.minLines,
     this.maxLines = 1,
     this.keyboardType,
   });
@@ -19,11 +20,15 @@ class AppTextField extends StatelessWidget {
   final String hint;
   final IconData prefixIcon;
   final ValueChanged<String> onChanged;
-  final int maxLines;
+  final int? minLines;
+  final int? maxLines;
   final TextInputType? keyboardType;
 
   @override
   Widget build(BuildContext context) {
+    final isMultiline =
+        maxLines == null || (maxLines ?? 1) > 1 || (minLines ?? 1) > 1;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -38,6 +43,7 @@ class AppTextField extends StatelessWidget {
         SizedBox(height: 8.h),
         TextField(
           controller: controller,
+          minLines: minLines,
           maxLines: maxLines,
           keyboardType: keyboardType,
           onChanged: onChanged,
@@ -49,7 +55,7 @@ class AppTextField extends StatelessWidget {
                     fillColor: AppColors.white,
                     contentPadding: EdgeInsets.symmetric(
                       horizontal: 18.w,
-                      vertical: maxLines > 1 ? 18.h : 16.h,
+                      vertical: isMultiline ? 18.h : 16.h,
                     ),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(20.r),

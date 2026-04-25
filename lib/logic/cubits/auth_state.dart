@@ -6,6 +6,7 @@ enum AuthAction {
   none,
   refresh,
   login,
+  biometricLogin,
   signUp,
   changePassword,
   logout,

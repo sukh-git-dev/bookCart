@@ -3,14 +3,26 @@ import 'package:bookcart/data/models/user_model.dart';
 abstract class AuthRepository {
   Future<UserModel?> getCurrentUser();
 
-  Future<UserModel> login({required String email, required String password});
+  Stream<UserModel?> watchCurrentUser();
+
+  Future<UserModel> login({
+    required String email,
+    required String password,
+    String? location,
+    double? latitude,
+    double? longitude,
+    DateTime? locationUpdatedAt,
+  });
 
   Future<UserModel> signUp({
     required String name,
     required String phone,
     required String email,
     required String password,
-    String location = 'Kolkata, West Bengal',
+    String location = UserModel.defaultLocation,
+    double? latitude,
+    double? longitude,
+    DateTime? locationUpdatedAt,
     String? profileImageBase64,
   });
 

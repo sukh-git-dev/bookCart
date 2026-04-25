@@ -1,6 +1,7 @@
 import 'package:bookcart/data/models/user_model.dart';
 import 'package:bookcart/data/repository/auth_repository.dart';
 import 'package:bookcart/core/constants/app_colors.dart';
+import 'package:bookcart/core/utils/app_animation_utils.dart';
 import 'package:bookcart/core/theme/app_color_palette.dart';
 import 'package:bookcart/logic/cubits/auth_cubit.dart';
 import 'package:bookcart/logic/cubits/auth_state.dart';
@@ -104,7 +105,7 @@ class _ProfileView extends StatelessWidget {
                 child: Center(
                   child: ConstrainedBox(
                     constraints: BoxConstraints(maxWidth: isWide ? 920 : 760),
-                    child: Column(
+                    child: AppStaggeredColumn(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         const AccountHeroCard(),
@@ -294,7 +295,7 @@ class _AccountMenuCard extends StatelessWidget {
                 ),
               );
             },
-          ),
+          ).animateListItem(order: 0),
           SizedBox(height: 12.h),
           AccountMenuTile(
             icon: Icons.lock_reset_rounded,
@@ -305,7 +306,7 @@ class _AccountMenuCard extends StatelessWidget {
                 MaterialPageRoute(builder: (_) => const ChangePasswordScreen()),
               );
             },
-          ),
+          ).animateListItem(order: 1),
           SizedBox(height: 12.h),
           AccountMenuTile(
             icon: Icons.privacy_tip_rounded,
@@ -316,7 +317,7 @@ class _AccountMenuCard extends StatelessWidget {
                 context,
               ).push(MaterialPageRoute(builder: (_) => const PrivacyScreen()));
             },
-          ),
+          ).animateListItem(order: 2),
           SizedBox(height: 12.h),
           AccountMenuTile(
             icon: Icons.info_rounded,
@@ -327,7 +328,7 @@ class _AccountMenuCard extends StatelessWidget {
                 context,
               ).push(MaterialPageRoute(builder: (_) => const AboutScreen()));
             },
-          ),
+          ).animateListItem(order: 3),
           SizedBox(height: 12.h),
           AccountMenuTile(
             icon: Icons.block_rounded,
@@ -340,7 +341,7 @@ class _AccountMenuCard extends StatelessWidget {
                 message: 'Do you want to disable ads for this account?',
               );
             },
-          ),
+          ).animateListItem(order: 4),
           SizedBox(height: 12.h),
           AccountMenuTile(
             icon: Icons.logout_rounded,
@@ -356,7 +357,7 @@ class _AccountMenuCard extends StatelessWidget {
                 },
               );
             },
-          ),
+          ).animateListItem(order: 5),
           SizedBox(height: 12.h),
           AccountMenuTile(
             icon: Icons.delete_forever_rounded,
@@ -373,7 +374,7 @@ class _AccountMenuCard extends StatelessWidget {
                 },
               );
             },
-          ),
+          ).animateListItem(order: 6),
         ],
       ),
     );

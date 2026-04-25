@@ -1,4 +1,5 @@
 import 'package:bookcart/core/constants/app_colors.dart';
+import 'package:bookcart/core/utils/app_animation_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -30,7 +31,7 @@ class FirebaseSetupScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-                child: Column(
+                child: AppStaggeredColumn(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Container(
@@ -94,7 +95,7 @@ class FirebaseSetupScreen extends StatelessWidget {
                     ),
                   ],
                 ),
-              ),
+              ).animatePage(),
             ),
           ),
         ),

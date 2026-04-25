@@ -1,9 +1,12 @@
 import 'package:bookcart/core/constants/app_colors.dart';
+import 'package:bookcart/core/utils/app_animation_utils.dart';
+import 'package:bookcart/data/repository/biometric_auth_repository.dart';
 import 'package:bookcart/logic/cubits/auth_cubit.dart';
 import 'package:bookcart/logic/cubits/auth_state.dart';
 import 'package:bookcart/presentation/screens/auth/signup_screen.dart';
 import 'package:bookcart/presentation/screens/home/home_shell_screen.dart';
 import 'package:bookcart/presentation/widgets/app_toast.dart';
+import 'package:bookcart/presentation/widgets/auth_text_field.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -20,6 +23,21 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  bool _hidePassword = true;
+  bool _loadedBiometricStatus = false;
+  bool _biometricAvailable = false;
+  bool _hasBiometricCredentials = false;
+  bool _saveForBiometrics = false;
+  String _biometricLabel = 'Face ID';
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_loadedBiometricStatus) {
+      _loadedBiometricStatus = true;
+      _loadBiometricStatus();
+    }
+  }
 
   @override
   void dispose() {
@@ -41,7 +59,38 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     FocusScope.of(context).unfocus();
-    await context.read<AuthCubit>().login(email: email, password: password);
+    await context.read<AuthCubit>().login(
+      email: email,
+      password: password,
+      enableBiometricLogin: _biometricAvailable && _saveForBiometrics,
+      disableBiometricLogin: _biometricAvailable && !_saveForBiometrics,
+    );
+  }
+
+  Future<void> _loginWithBiometrics() async {
+    FocusScope.of(context).unfocus();
+    await context.read<AuthCubit>().loginWithBiometrics();
+    if (mounted) {
+      await _loadBiometricStatus();
+    }
+  }
+
+  Future<void> _loadBiometricStatus() async {
+    final biometricRepository = context.read<BiometricAuthRepository>();
+    final canUseBiometrics = await biometricRepository.canUseBiometrics();
+    final hasCredentials = await biometricRepository.hasSavedCredentials();
+    final label = await biometricRepository.preferredBiometricLabel();
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _biometricAvailable = canUseBiometrics;
+      _hasBiometricCredentials = hasCredentials;
+      _saveForBiometrics = canUseBiometrics && hasCredentials;
+      _biometricLabel = label;
+    });
   }
 
   @override
@@ -49,7 +98,8 @@ class _LoginScreenState extends State<LoginScreen> {
     return BlocListener<AuthCubit, AuthState>(
       listenWhen: (previous, current) =>
           previous.status != current.status ||
-          previous.errorMessage != current.errorMessage,
+          previous.errorMessage != current.errorMessage ||
+          previous.successMessage != current.successMessage,
       listener: (context, state) {
         if (state.errorMessage != null) {
           AppToast.show(
@@ -58,7 +108,18 @@ class _LoginScreenState extends State<LoginScreen> {
             type: AppToastType.error,
           );
           context.read<AuthCubit>().clearFeedback();
+          _loadBiometricStatus();
           return;
+        }
+
+        if (state.successMessage != null &&
+            state.status != AuthStatus.authenticated) {
+          AppToast.show(
+            context,
+            message: state.successMessage!,
+            type: AppToastType.success,
+          );
+          context.read<AuthCubit>().clearFeedback();
         }
 
         if (state.status == AuthStatus.authenticated) {
@@ -71,8 +132,12 @@ class _LoginScreenState extends State<LoginScreen> {
       child: Builder(
         builder: (context) {
           final authState = context.watch<AuthCubit>().state;
-          final isSubmitting =
+          final isPasswordSubmitting =
               authState.isSubmitting && authState.action == AuthAction.login;
+          final isBiometricSubmitting =
+              authState.isSubmitting &&
+              authState.action == AuthAction.biometricLogin;
+          final isSubmitting = authState.isSubmitting;
 
           return Scaffold(
             backgroundColor: AppColors.background,
@@ -82,12 +147,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   final isWide = constraints.maxWidth >= 1000;
                   final form = _AuthCard(
                     title: 'Login',
-                    subtitle:
-                        'Continue with your email address and password in the same BookCart style.',
-                    child: Column(
+                    subtitle: 'Sign in with your email address and password.',
+                    child: AppStaggeredColumn(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _AuthTextField(
+                        AuthTextField(
                           controller: _emailController,
                           label: 'Email',
                           hint: 'Enter email address',
@@ -95,14 +159,71 @@ class _LoginScreenState extends State<LoginScreen> {
                           keyboardType: TextInputType.emailAddress,
                         ),
                         SizedBox(height: 14.h),
-                        _AuthTextField(
+                        AuthTextField(
                           controller: _passwordController,
                           label: 'Password',
                           hint: 'Enter password',
                           icon: Icons.lock_rounded,
-                          obscureText: true,
+                          obscureText: _hidePassword,
+                          suffixIcon: IconButton(
+                            onPressed: () {
+                              setState(() {
+                                _hidePassword = !_hidePassword;
+                              });
+                            },
+                            icon: Icon(
+                              _hidePassword
+                                  ? Icons.visibility_rounded
+                                  : Icons.visibility_off_rounded,
+                            ),
+                          ),
                         ),
                         SizedBox(height: 22.h),
+                        if (_hasBiometricCredentials) ...[
+                          SizedBox(
+                            width: double.infinity,
+                            child: OutlinedButton.icon(
+                              onPressed: isSubmitting
+                                  ? null
+                                  : _loginWithBiometrics,
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: AppColors.primary,
+                                minimumSize: Size(double.infinity, 50.h),
+                                side: BorderSide(color: AppColors.primary),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(20.r),
+                                ),
+                              ),
+                              icon: Icon(Icons.face_rounded, size: 20.sp),
+                              label: Text(
+                                isBiometricSubmitting
+                                    ? 'Checking $_biometricLabel...'
+                                    : 'Login with $_biometricLabel',
+                                style: TextStyle(
+                                  fontSize: 15.sp,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ),
+                          SizedBox(height: 14.h),
+                        ],
+                        if (_biometricAvailable) ...[
+                          _BiometricPreferenceTile(
+                            title: 'Enable $_biometricLabel login',
+                            subtitle:
+                                'Use this device biometric check next time.',
+                            value: _saveForBiometrics,
+                            onChanged: isSubmitting
+                                ? null
+                                : (value) {
+                                    setState(() {
+                                      _saveForBiometrics = value;
+                                    });
+                                  },
+                          ),
+                          SizedBox(height: 18.h),
+                        ],
                         SizedBox(
                           width: double.infinity,
                           child: FilledButton(
@@ -116,7 +237,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                             child: Text(
-                              isSubmitting ? 'Logging in...' : 'Login',
+                              isPasswordSubmitting ? 'Logging in...' : 'Login',
                               style: TextStyle(
                                 fontSize: 16.sp,
                                 fontWeight: FontWeight.w700,
@@ -142,16 +263,22 @@ class _LoginScreenState extends State<LoginScreen> {
                   return isWide
                       ? Row(
                           children: [
-                            const Expanded(child: _AuthHeroPanel()),
+                            Expanded(
+                              child: const _AuthHeroPanel().animatePage(),
+                            ),
                             Expanded(
                               child: Center(
                                 child: SingleChildScrollView(
                                   padding: const EdgeInsets.all(32),
+                                  keyboardDismissBehavior:
+                                      ScrollViewKeyboardDismissBehavior.onDrag,
                                   child: ConstrainedBox(
                                     constraints: const BoxConstraints(
                                       maxWidth: 460,
                                     ),
-                                    child: form,
+                                    child: form.animatePage(
+                                      delay: const Duration(milliseconds: 120),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -160,11 +287,17 @@ class _LoginScreenState extends State<LoginScreen> {
                         )
                       : SingleChildScrollView(
                           padding: EdgeInsets.all(20.w),
+                          keyboardDismissBehavior:
+                              ScrollViewKeyboardDismissBehavior.onDrag,
                           child: Column(
                             children: [
-                              const _AuthHeroPanel(isCompact: true),
+                              const _AuthHeroPanel(
+                                isCompact: true,
+                              ).animatePage(),
                               SizedBox(height: 20.h),
-                              form,
+                              form.animatePage(
+                                delay: const Duration(milliseconds: 120),
+                              ),
                             ],
                           ),
                         );
@@ -294,61 +427,76 @@ class _AuthCard extends StatelessWidget {
   }
 }
 
-class _AuthTextField extends StatelessWidget {
-  const _AuthTextField({
-    required this.controller,
-    required this.label,
-    required this.hint,
-    required this.icon,
-    this.obscureText = false,
-    this.keyboardType,
+class _BiometricPreferenceTile extends StatelessWidget {
+  const _BiometricPreferenceTile({
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onChanged,
   });
 
-  final TextEditingController controller;
-  final String label;
-  final String hint;
-  final IconData icon;
-  final bool obscureText;
-  final TextInputType? keyboardType;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 13.sp,
-            fontWeight: FontWeight.w700,
-            color: AppColors.dark,
+    return Container(
+      padding: EdgeInsets.all(14.w),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(20.r),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 42.w,
+            height: 42.w,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(16.r),
+            ),
+            child: Icon(
+              Icons.face_retouching_natural_rounded,
+              color: AppColors.primary,
+              size: 22.sp,
+            ),
           ),
-        ),
-        SizedBox(height: 8.h),
-        TextField(
-          controller: controller,
-          obscureText: obscureText,
-          keyboardType: keyboardType,
-          style: TextStyle(color: AppColors.dark, fontSize: 14.sp),
-          decoration: InputDecoration(hintText: hint, prefixIcon: Icon(icon))
-              .applyDefaults(Theme.of(context).inputDecorationTheme)
-              .copyWith(
-                fillColor: AppColors.surface,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20.r),
-                  borderSide: BorderSide.none,
+          SizedBox(width: 12.w),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.dark,
+                  ),
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20.r),
-                  borderSide: BorderSide(color: AppColors.border),
+                SizedBox(height: 4.h),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12.sp,
+                    height: 1.35,
+                    color: AppColors.muted,
+                  ),
                 ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(20.r),
-                  borderSide: BorderSide(color: AppColors.primary, width: 1.4),
-                ),
-              ),
-        ),
-      ],
+              ],
+            ),
+          ),
+          Switch.adaptive(
+            value: value,
+            activeThumbColor: AppColors.primary,
+            activeTrackColor: AppColors.primary.withValues(alpha: 0.25),
+            onChanged: onChanged,
+          ),
+        ],
+      ),
     );
   }
 }

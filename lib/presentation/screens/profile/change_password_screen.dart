@@ -1,6 +1,8 @@
 import 'package:bookcart/core/constants/app_colors.dart';
+import 'package:bookcart/core/utils/app_animation_utils.dart';
 import 'package:bookcart/logic/cubits/auth_cubit.dart';
 import 'package:bookcart/logic/cubits/auth_state.dart';
+import 'package:bookcart/presentation/widgets/auth_text_field.dart';
 import 'package:bookcart/presentation/widgets/app_toast.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -146,7 +148,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       ),
                     ],
                   ),
-                  child: Column(
+                  child: AppStaggeredColumn(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
@@ -168,40 +170,64 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                         ),
                       ),
                       SizedBox(height: 22.h),
-                      _PasswordField(
+                      AuthTextField(
                         controller: _currentPasswordController,
                         label: 'Current Password',
-                        hintText: 'Enter current password',
+                        hint: 'Enter current password',
+                        icon: Icons.lock_rounded,
                         obscureText: _hideCurrentPassword,
-                        onToggleVisibility: () {
-                          setState(() {
-                            _hideCurrentPassword = !_hideCurrentPassword;
-                          });
-                        },
+                        suffixIcon: IconButton(
+                          onPressed: () {
+                            setState(() {
+                              _hideCurrentPassword = !_hideCurrentPassword;
+                            });
+                          },
+                          icon: Icon(
+                            _hideCurrentPassword
+                                ? Icons.visibility_rounded
+                                : Icons.visibility_off_rounded,
+                          ),
+                        ),
                       ),
                       SizedBox(height: 14.h),
-                      _PasswordField(
+                      AuthTextField(
                         controller: _newPasswordController,
                         label: 'New Password',
-                        hintText: 'Create new password',
+                        hint: 'Create new password',
+                        icon: Icons.lock_rounded,
                         obscureText: _hideNewPassword,
-                        onToggleVisibility: () {
-                          setState(() {
-                            _hideNewPassword = !_hideNewPassword;
-                          });
-                        },
+                        suffixIcon: IconButton(
+                          onPressed: () {
+                            setState(() {
+                              _hideNewPassword = !_hideNewPassword;
+                            });
+                          },
+                          icon: Icon(
+                            _hideNewPassword
+                                ? Icons.visibility_rounded
+                                : Icons.visibility_off_rounded,
+                          ),
+                        ),
                       ),
                       SizedBox(height: 14.h),
-                      _PasswordField(
+                      AuthTextField(
                         controller: _confirmPasswordController,
                         label: 'Confirm Password',
-                        hintText: 'Re-enter new password',
+                        hint: 'Re-enter new password',
+                        icon: Icons.lock_rounded,
                         obscureText: _hideConfirmPassword,
-                        onToggleVisibility: () {
-                          setState(() {
-                            _hideConfirmPassword = !_hideConfirmPassword;
-                          });
-                        },
+                        suffixIcon: IconButton(
+                          onPressed: () {
+                            setState(() {
+                              _hideConfirmPassword = !_hideConfirmPassword;
+                            });
+                          },
+                          icon: Icon(
+                            _hideConfirmPassword
+                                ? Icons.visibility_rounded
+                                : Icons.visibility_off_rounded,
+                          ),
+                        ),
                       ),
                       SizedBox(height: 22.h),
                       SizedBox(
@@ -215,63 +241,12 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
                       ),
                     ],
                   ),
-                ),
+                ).animatePage(),
               ),
             ),
           ),
         );
       },
-    );
-  }
-}
-
-class _PasswordField extends StatelessWidget {
-  const _PasswordField({
-    required this.controller,
-    required this.label,
-    required this.hintText,
-    required this.obscureText,
-    required this.onToggleVisibility,
-  });
-
-  final TextEditingController controller;
-  final String label;
-  final String hintText;
-  final bool obscureText;
-  final VoidCallback onToggleVisibility;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            color: AppColors.dark,
-            fontSize: 13.sp,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-        SizedBox(height: 8.h),
-        TextField(
-          controller: controller,
-          obscureText: obscureText,
-          enabled: true,
-          decoration: InputDecoration(
-            hintText: hintText,
-            prefixIcon: const Icon(Icons.lock_rounded),
-            suffixIcon: IconButton(
-              onPressed: onToggleVisibility,
-              icon: Icon(
-                obscureText
-                    ? Icons.visibility_rounded
-                    : Icons.visibility_off_rounded,
-              ),
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

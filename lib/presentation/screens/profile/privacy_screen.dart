@@ -1,4 +1,5 @@
 import 'package:bookcart/core/constants/app_colors.dart';
+import 'package:bookcart/core/utils/app_animation_utils.dart';
 import 'package:bookcart/presentation/screens/profile/widgets/policy_card.dart';
 import 'package:bookcart/presentation/screens/profile/widgets/policy_header.dart';
 import 'package:flutter/material.dart';
@@ -31,7 +32,7 @@ class PrivacyScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Column(
+              child: AppStaggeredColumn(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const PolicyHeader(
@@ -44,7 +45,7 @@ class PrivacyScreen extends StatelessWidget {
                   const PolicyCard(
                     title: 'Account Data',
                     body:
-                        'Your name, phone number, email, and location are stored in Firebase Authentication and Cloud Firestore for account access and profile display.',
+                        'Your name, phone number, email, and location are stored in Supabase Auth and Postgres for account access and profile display.',
                   ),
                   SizedBox(height: 12.h),
                   const PolicyCard(
@@ -56,17 +57,17 @@ class PrivacyScreen extends StatelessWidget {
                   const PolicyCard(
                     title: 'Chats And Listings',
                     body:
-                        'Chats and listings are shown in the app UI, while authenticated account actions use Firebase-backed storage and identity services.',
+                        'Chats and listings are shown in the app UI, while authenticated account actions use Supabase-backed storage and identity services.',
                   ),
                   SizedBox(height: 12.h),
                   const PolicyCard(
                     title: 'User Control',
                     body:
-                        'You can update your account details, logout from the current session, or delete your Firebase-backed account from the account screen.',
+                        'You can update your account details, logout from the current session, or delete your Supabase-backed account from the account screen.',
                   ),
                 ],
               ),
-            ),
+            ).animatePage(),
           ),
         ),
       ),

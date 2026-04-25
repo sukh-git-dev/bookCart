@@ -2,7 +2,11 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:bookcart/core/constants/app_colors.dart';
+import 'package:bookcart/core/utils/app_animation_utils.dart';
+import 'package:bookcart/core/utils/location_label_utils.dart';
+import 'package:bookcart/core/utils/location_time_utils.dart';
 import 'package:bookcart/data/models/user_model.dart';
+import 'package:bookcart/data/repository/device_location_repository.dart';
 import 'package:bookcart/logic/cubits/auth_cubit.dart';
 import 'package:bookcart/logic/cubits/profile_cubit.dart';
 import 'package:bookcart/logic/cubits/profile_state.dart';
@@ -31,19 +35,36 @@ class _AccountInfoScreenState extends State<AccountInfoScreen> {
   bool _isEditing = false;
   Uint8List? _profileImageBytes;
   String? _profileImageBase64;
+  String? _profileImageUrl;
+  String? _syncedLocationLabel;
+  DateTime? _locationUpdatedAt;
+  double? _latitude;
+  double? _longitude;
+  bool _isFetchingLocation = false;
 
   @override
   void initState() {
     super.initState();
+    final initialLocationLabel = visibleLocationLabel(
+      widget.user.location,
+      fallback: widget.user.latitude != null && widget.user.longitude != null
+          ? kCurrentLocationSyncedLabel
+          : UserModel.defaultLocation,
+    );
     _nameController = TextEditingController(text: widget.user.name);
     _phoneController = TextEditingController(text: widget.user.phone);
     _emailController = TextEditingController(text: widget.user.email);
-    _locationController = TextEditingController(text: widget.user.location);
-    if (widget.user.profileImageBase64 != null &&
-        widget.user.profileImageBase64!.isNotEmpty) {
-      _profileImageBase64 = widget.user.profileImageBase64;
-      _profileImageBytes = base64Decode(widget.user.profileImageBase64!);
-    }
+    _locationController = TextEditingController(text: initialLocationLabel);
+    _syncedLocationLabel =
+        widget.user.latitude != null && widget.user.longitude != null
+        ? readableLocationLabel(initialLocationLabel)
+        : null;
+    _locationUpdatedAt = widget.user.locationUpdatedAt;
+    _latitude = widget.user.latitude;
+    _longitude = widget.user.longitude;
+    _profileImageBase64 = widget.user.profileImageBase64;
+    _profileImageUrl = widget.user.profileImageUrl;
+    _profileImageBytes = widget.user.profileImageBytes;
   }
 
   @override
@@ -69,10 +90,25 @@ class _AccountInfoScreenState extends State<AccountInfoScreen> {
     setState(() {
       _profileImageBytes = bytes;
       _profileImageBase64 = base64Encode(bytes);
+      _profileImageUrl = null;
     });
   }
 
   Future<void> _save() async {
+    final nextLocation = _locationController.text.trim().isEmpty
+        ? visibleLocationLabel(
+            widget.user.location,
+            fallback:
+                widget.user.latitude != null && widget.user.longitude != null
+                ? kCurrentLocationSyncedLabel
+                : UserModel.defaultLocation,
+          )
+        : _locationController.text.trim();
+    final shouldKeepCoordinates =
+        _latitude != null &&
+        _longitude != null &&
+        _syncedLocationLabel != null &&
+        nextLocation == _syncedLocationLabel;
     final updatedUser = widget.user.copyWith(
       name: _nameController.text.trim().isEmpty
           ? widget.user.name
@@ -83,13 +119,68 @@ class _AccountInfoScreenState extends State<AccountInfoScreen> {
       email: _emailController.text.trim().isEmpty
           ? widget.user.email
           : _emailController.text.trim(),
-      location: _locationController.text.trim().isEmpty
-          ? widget.user.location
-          : _locationController.text.trim(),
+      location: nextLocation,
+      latitude: shouldKeepCoordinates ? _latitude : null,
+      longitude: shouldKeepCoordinates ? _longitude : null,
+      locationUpdatedAt: shouldKeepCoordinates ? _locationUpdatedAt : null,
       profileImageBase64: _profileImageBase64,
+      profileImageUrl: _profileImageUrl,
+      clearCoordinates: !shouldKeepCoordinates,
+      clearLocationUpdatedAt: !shouldKeepCoordinates,
+      clearProfileImageUrl:
+          _profileImageBase64 != null &&
+          _profileImageBase64!.isNotEmpty &&
+          _profileImageUrl == null,
     );
 
     await context.read<ProfileCubit>().updateProfile(updatedUser);
+  }
+
+  Future<void> _syncCurrentLocation() async {
+    if (_isFetchingLocation) {
+      return;
+    }
+
+    FocusScope.of(context).unfocus();
+    setState(() {
+      _isFetchingLocation = true;
+    });
+
+    try {
+      final snapshot = await context
+          .read<DeviceLocationRepository>()
+          .getCurrentLocation();
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _locationController.text = snapshot.label;
+        _syncedLocationLabel = snapshot.label;
+        _latitude = snapshot.latitude;
+        _longitude = snapshot.longitude;
+        _locationUpdatedAt = snapshot.capturedAt;
+      });
+
+      AppToast.show(
+        context,
+        message:
+            'Current location updated. ${formatLocationRefreshTime(snapshot.capturedAt)}. Save to keep the change.',
+        type: AppToastType.success,
+      );
+    } on DeviceLocationException catch (error) {
+      if (!mounted) {
+        return;
+      }
+
+      AppToast.show(context, message: error.message, type: AppToastType.error);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isFetchingLocation = false;
+        });
+      }
+    }
   }
 
   @override
@@ -129,6 +220,11 @@ class _AccountInfoScreenState extends State<AccountInfoScreen> {
       },
       builder: (context, state) {
         final isSaving = state.isSaving;
+        final locationMatchesSyncedCoordinates =
+            _latitude != null &&
+            _longitude != null &&
+            _syncedLocationLabel != null &&
+            _locationController.text.trim() == _syncedLocationLabel;
 
         return Scaffold(
           backgroundColor: AppColors.background,
@@ -167,7 +263,7 @@ class _AccountInfoScreenState extends State<AccountInfoScreen> {
                       ),
                     ],
                   ),
-                  child: Column(
+                  child: AppStaggeredColumn(
                     children: [
                       GestureDetector(
                         onTap: _isEditing && !isSaving
@@ -191,6 +287,19 @@ class _AccountInfoScreenState extends State<AccountInfoScreen> {
                                     ? Image.memory(
                                         _profileImageBytes!,
                                         fit: BoxFit.cover,
+                                      )
+                                    : _profileImageUrl != null &&
+                                          _profileImageUrl!.isNotEmpty
+                                    ? Image.network(
+                                        _profileImageUrl!,
+                                        fit: BoxFit.cover,
+                                        errorBuilder:
+                                            (context, error, stackTrace) =>
+                                                Icon(
+                                                  Icons.person_rounded,
+                                                  size: 52.sp,
+                                                  color: AppColors.primary,
+                                                ),
                                       )
                                     : Icon(
                                         Icons.person_rounded,
@@ -239,11 +348,71 @@ class _AccountInfoScreenState extends State<AccountInfoScreen> {
                         keyboardType: TextInputType.emailAddress,
                       ),
                       SizedBox(height: 14.h),
-                      InfoField(
-                        label: 'Location',
-                        controller: _locationController,
-                        enabled: _isEditing && !isSaving,
-                        icon: Icons.location_on_rounded,
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Location',
+                            style: TextStyle(
+                              fontSize: 13.sp,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.dark,
+                            ),
+                          ),
+                          SizedBox(height: 8.h),
+                          TextField(
+                            controller: _locationController,
+                            enabled: _isEditing && !isSaving,
+                            style: TextStyle(
+                              color: AppColors.dark,
+                              fontSize: 14.sp,
+                            ),
+                            decoration: InputDecoration(
+                              prefixIcon: const Icon(Icons.location_on_rounded),
+                              filled: true,
+                              fillColor: _isEditing && !isSaving
+                                  ? AppColors.surface
+                                  : const Color(0xFFF7FBFA),
+                            ),
+                          ),
+                          SizedBox(height: 10.h),
+                          Text(
+                            locationMatchesSyncedCoordinates
+                                ? formatLocationRefreshTime(_locationUpdatedAt)
+                                : 'Manual location text will clear the live-location timestamp until you sync again.',
+                            style: TextStyle(
+                              fontSize: 12.sp,
+                              height: 1.35,
+                              color: AppColors.muted,
+                            ),
+                          ),
+                          if (_isEditing) ...[
+                            SizedBox(height: 12.h),
+                            SizedBox(
+                              width: double.infinity,
+                              child: OutlinedButton.icon(
+                                onPressed: isSaving || _isFetchingLocation
+                                    ? null
+                                    : _syncCurrentLocation,
+                                icon: Icon(
+                                  _isFetchingLocation
+                                      ? Icons.sync_rounded
+                                      : Icons.my_location_rounded,
+                                  size: 18.sp,
+                                ),
+                                label: Text(
+                                  _isFetchingLocation
+                                      ? 'Updating location...'
+                                      : 'Use Current Location',
+                                ),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: AppColors.primary,
+                                  side: BorderSide(color: AppColors.primary),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                       if (_isEditing) ...[
                         SizedBox(height: 22.h),

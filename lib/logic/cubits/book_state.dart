@@ -2,7 +2,7 @@ import 'package:bookcart/data/models/book_model.dart';
 
 class BookState {
   const BookState({
-    this.currentTabIndex = 2,
+    this.currentTabIndex = 0,
     this.books = const [],
     this.draft = const BookModel(),
     this.isLoadingBooks = true,

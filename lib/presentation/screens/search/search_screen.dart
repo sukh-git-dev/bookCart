@@ -5,52 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 class SearchScreen extends StatelessWidget {
   const SearchScreen({super.key});
 
-  static const List<_ChatPreview> _chats = [
-    _ChatPreview(
-      name: 'Aman Verma',
-      bookTitle: 'Engineering Mechanics',
-      lastMessage: 'Is this book still available?',
-      time: '10:24 AM',
-      unreadCount: 2,
-      messages: [
-        _ChatMessage(
-          text: 'Hi, I saw your listing for Engineering Mechanics.',
-          isMine: false,
-        ),
-        _ChatMessage(text: 'Yes, it is available.', isMine: true),
-        _ChatMessage(text: 'Is this book still available?', isMine: false),
-      ],
-    ),
-    _ChatPreview(
-      name: 'Priya Das',
-      bookTitle: 'Mathematics Basics',
-      lastMessage: 'Can you share the condition of the pages?',
-      time: 'Yesterday',
-      messages: [
-        _ChatMessage(
-          text: 'Can you share the condition of the pages?',
-          isMine: false,
-        ),
-        _ChatMessage(
-          text: 'Pages are clean and only lightly used.',
-          isMine: true,
-        ),
-      ],
-    ),
-    _ChatPreview(
-      name: 'Rahul Sen',
-      bookTitle: 'Competitive Exam Toolkit',
-      lastMessage: 'I can pick it up this evening.',
-      time: 'Mon',
-      messages: [
-        _ChatMessage(text: 'I can pick it up this evening.', isMine: false),
-        _ChatMessage(
-          text: 'That works. Message me before you arrive.',
-          isMine: true,
-        ),
-      ],
-    ),
-  ];
+  static const List<_ChatPreview> _chats = [];
 
   @override
   Widget build(BuildContext context) {
@@ -239,6 +194,8 @@ class _ChatDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visibleMessages = chat.messages.reversed.toList(growable: false);
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -328,10 +285,11 @@ class _ChatDetailScreen extends StatelessWidget {
           ),
           Expanded(
             child: ListView.builder(
+              reverse: true,
               padding: EdgeInsets.fromLTRB(16.w, 8.h, 16.w, 16.h),
-              itemCount: chat.messages.length,
+              itemCount: visibleMessages.length,
               itemBuilder: (_, index) {
-                final message = chat.messages[index];
+                final message = visibleMessages[index];
                 return Align(
                   alignment: message.isMine
                       ? Alignment.centerRight
@@ -737,7 +695,7 @@ class _ChatPreview {
     required this.lastMessage,
     required this.time,
     required this.messages,
-    this.unreadCount = 0,
+    required this.unreadCount,
   });
 
   final String name;

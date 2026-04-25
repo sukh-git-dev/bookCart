@@ -1,4 +1,5 @@
 import 'package:bookcart/core/constants/app_colors.dart';
+import 'package:bookcart/core/utils/app_animation_utils.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
@@ -103,7 +104,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 960),
-              child: Column(
+              child: AppStaggeredColumn(
                 children: [
                   Row(
                     children: [
@@ -194,7 +195,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                       );
                               },
                             ),
-                          );
+                          ).animatePage();
                         },
                       ),
                     ),

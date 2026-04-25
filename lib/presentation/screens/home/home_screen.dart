@@ -1,9 +1,15 @@
 import 'package:bookcart/core/constants/app_colors.dart';
 import 'package:bookcart/core/constants/book_categories.dart';
+import 'package:bookcart/core/utils/app_animation_utils.dart';
+import 'package:bookcart/core/utils/location_distance_utils.dart';
+import 'package:bookcart/core/utils/location_label_utils.dart';
 import 'package:bookcart/data/models/book_model.dart';
 import 'package:bookcart/data/models/category_model.dart';
+import 'package:bookcart/data/models/user_model.dart';
+import 'package:bookcart/logic/cubits/auth_cubit.dart';
 import 'package:bookcart/logic/cubits/book_cubit.dart';
 import 'package:bookcart/logic/cubits/book_state.dart';
+import 'package:bookcart/logic/cubits/chat_cubit.dart';
 import 'package:bookcart/presentation/screens/home/book_detail_screen.dart';
 import 'package:bookcart/presentation/widgets/app_shimmer.dart';
 import 'package:bookcart/presentation/widgets/banner_ad_widget.dart';
@@ -11,6 +17,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+
+import '../../widgets/app_toast.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -43,21 +51,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = context.select((AuthCubit cubit) => cubit.state.user);
+
     return BlocBuilder<BookCubit, BookState>(
       builder: (context, state) {
-        final filteredBooks = state.books.where((book) {
-          final query = searchQuery.trim().toLowerCase();
-          final matchesSearch =
-              query.isEmpty ||
-              book.title.toLowerCase().contains(query) ||
-              book.author.toLowerCase().contains(query) ||
-              book.categoryLabel.toLowerCase().contains(query) ||
-              book.description.toLowerCase().contains(query);
-          final matchesCategory =
-              selectedCategory == 'All' ||
-              book.belongsToCategory(selectedCategory);
-          return matchesSearch && matchesCategory;
-        }).toList();
+        final filteredBooks = _sortBooksByDistance(
+          state.books.where((book) {
+            final query = searchQuery.trim().toLowerCase();
+            final matchesSearch =
+                query.isEmpty ||
+                book.title.toLowerCase().contains(query) ||
+                book.author.toLowerCase().contains(query) ||
+                book.categoryLabel.toLowerCase().contains(query) ||
+                book.description.toLowerCase().contains(query);
+            final matchesCategory =
+                selectedCategory == 'All' ||
+                book.belongsToCategory(selectedCategory);
+            return matchesSearch && matchesCategory;
+          }).toList(),
+          currentUser,
+        );
 
         return LayoutBuilder(
           builder: (context, constraints) {
@@ -72,10 +85,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         constraints: BoxConstraints(
                           maxWidth: isWide ? 1260 : 760,
                         ),
-                        child: Column(
+                        child: AppStaggeredColumn(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             _HomeHeroCard(bookCount: state.books.length),
+                            SizedBox(height: 14.h),
+                            // _NearbyRadiusCard(
+                            //   hasCurrentLocation: hasCurrentLocation,
+                            //   nearbyBookCount: nearbyBookCount,
+                            // ),
                             SizedBox(height: 22.h),
                             Text(
                               'Book Store',
@@ -439,6 +457,52 @@ class _HomeScreenState extends State<HomeScreen> {
       },
     );
   }
+
+  List<BookModel> _sortBooksByDistance(
+    List<BookModel> books,
+    UserModel? currentUser,
+  ) {
+    final sortedBooks = List<BookModel>.from(books);
+    if (currentUser?.latitude == null || currentUser?.longitude == null) {
+      return sortedBooks;
+    }
+
+    sortedBooks.sort((firstBook, secondBook) {
+      final firstDistance = _distanceFromCurrentUser(firstBook, currentUser);
+      final secondDistance = _distanceFromCurrentUser(secondBook, currentUser);
+      final firstIsNearby = isWithinNearbyRadius(firstDistance);
+      final secondIsNearby = isWithinNearbyRadius(secondDistance);
+
+      if (firstIsNearby != secondIsNearby) {
+        return firstIsNearby ? -1 : 1;
+      }
+
+      if (firstDistance != null && secondDistance != null) {
+        return firstDistance.compareTo(secondDistance);
+      }
+
+      if (firstDistance != null) {
+        return -1;
+      }
+
+      if (secondDistance != null) {
+        return 1;
+      }
+
+      return 0;
+    });
+
+    return sortedBooks;
+  }
+
+  double? _distanceFromCurrentUser(BookModel book, UserModel? currentUser) {
+    return calculateDistanceKm(
+      fromLatitude: currentUser?.latitude,
+      fromLongitude: currentUser?.longitude,
+      toLatitude: book.sellerLatitude,
+      toLongitude: book.sellerLongitude,
+    );
+  }
 }
 
 class _HomeBookSection extends StatelessWidget {
@@ -458,7 +522,7 @@ class _HomeBookSection extends StatelessWidget {
             Padding(
               padding: EdgeInsets.only(bottom: 14.h),
               child: _BookCard(book: books[index]),
-            ),
+            ).animateListItem(order: index),
           ],
           if (adIndex == books.length) const _InlineBannerAdCard(),
         ],
@@ -499,7 +563,8 @@ class _WideBookGrid extends StatelessWidget {
         mainAxisSpacing: 20,
         childAspectRatio: 1.65,
       ),
-      itemBuilder: (_, index) => _BookCard(book: books[index]),
+      itemBuilder: (_, index) =>
+          _BookCard(book: books[index]).animateListItem(order: index),
     );
   }
 }
@@ -640,8 +705,57 @@ class _BookCard extends StatelessWidget {
     ).push(MaterialPageRoute(builder: (_) => BookDetailScreen(book: book)));
   }
 
+  Future<void> _openChat(BuildContext context) async {
+    final user = context.read<AuthCubit>().state.user;
+    if (user == null) {
+      AppToast.show(
+        context,
+        message: 'Please log in again before opening chat.',
+        type: AppToastType.error,
+      );
+      return;
+    }
+
+    await context.read<ChatCubit>().startChatForBook(book: book, buyer: user);
+    if (!context.mounted) {
+      return;
+    }
+
+    final chatState = context.read<ChatCubit>().state;
+    if (chatState.errorMessage != null) {
+      AppToast.show(
+        context,
+        message: chatState.errorMessage!,
+        type: AppToastType.error,
+      );
+      context.read<ChatCubit>().clearFeedback();
+      return;
+    }
+
+    context.read<BookCubit>().changeTab(3);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final currentUser = context.select((AuthCubit cubit) => cubit.state.user);
+    final coverImageBytes = book.resolvedImageBytes;
+    final primaryImageUrl = book.primaryImageUrl;
+    final sellerLocationLabel = visibleLocationLabel(
+      book.sellerLocation,
+      fallback: kLocationUnavailableLabel,
+    );
+    final distanceLabel = formatDistanceKm(
+      calculateDistanceKm(
+        fromLatitude: currentUser?.latitude,
+        fromLongitude: currentUser?.longitude,
+        toLatitude: book.sellerLatitude,
+        toLongitude: book.sellerLongitude,
+      ),
+    );
+    final locationBadgeLabel = distanceLabel == 'Location'
+        ? compactLocationLabel(sellerLocationLabel)
+        : distanceLabel;
+
     return InkWell(
       borderRadius: BorderRadius.circular(24.r),
       onTap: () => _openDetail(context),
@@ -659,119 +773,202 @@ class _BookCard extends StatelessWidget {
             ),
           ],
         ),
-        child: Row(
+        child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 68.w,
-              height: 90.h,
+              width: double.infinity,
               decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(18.r),
+                gradient: LinearGradient(
+                  colors: [AppColors.dark, AppColors.primary],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(30.r),
               ),
-              child: Icon(
-                Icons.auto_stories_rounded,
-                size: 32.sp,
-                color: AppColors.primary,
-              ),
-            ),
-            SizedBox(width: 14.w),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              child: Stack(
                 children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(
-                        child: Text(
-                          book.title,
-                          style: TextStyle(
-                            fontSize: 17.sp,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.dark,
-                          ),
-                        ),
-                      ),
-                      SizedBox(width: 10.w),
-                      _MetaBadge(
-                        icon: Icons.location_on_rounded,
-                        label: '12 km',
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 8.h),
-                  Wrap(
-                    spacing: 8.w,
-                    runSpacing: 8.h,
-                    children: [
-                      _MetaBadge(
-                        icon: Icons.category_rounded,
-                        label: book.primaryCategory,
-                      ),
-                      if (book.additionalCategoryCount > 0)
-                        _MetaBadge(
-                          icon: Icons.layers_rounded,
-                          label: '+${book.additionalCategoryCount} more',
-                        ),
-                      _MetaBadge(
-                        icon: Icons.person_rounded,
-                        label: book.author,
-                      ),
-                    ],
-                  ),
-                  SizedBox(height: 10.h),
-                  Text(
-                    book.description.isEmpty ? 'Good Book' : book.description,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13.sp,
-                      height: 1.45,
-                      color: AppColors.dark,
+                  Container(
+                    width: double.infinity,
+                    height: 200.h,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(22.r),
                     ),
+                    child: coverImageBytes != null
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(22.r),
+                            child: Image.memory(
+                              coverImageBytes,
+                              fit: BoxFit.cover,
+                            ),
+                          )
+                        : primaryImageUrl != null && primaryImageUrl.isNotEmpty
+                        ? ClipRRect(
+                            borderRadius: BorderRadius.circular(22.r),
+                            child: Image.network(
+                              primaryImageUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) =>
+                                  Icon(
+                                    Icons.auto_stories_rounded,
+                                    size: 42.sp,
+                                    color: Colors.white,
+                                  ),
+                            ),
+                          )
+                        : Icon(
+                            Icons.auto_stories_rounded,
+                            size: 42.sp,
+                            color: Colors.white,
+                          ),
                   ),
-                  SizedBox(height: 14.h),
-                  Row(
-                    children: [
-                      Container(
+                  if (book.imageCount > 1)
+                    Positioned(
+                      right: 14.w,
+                      top: 14.h,
+                      child: Container(
                         padding: EdgeInsets.symmetric(
                           horizontal: 12.w,
-                          vertical: 10.h,
+                          vertical: 8.h,
                         ),
                         decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(16.r),
+                          color: AppColors.dark.withValues(alpha: 0.78),
+                          borderRadius: BorderRadius.circular(18.r),
                         ),
                         child: Text(
-                          '₹${book.price}',
+                          '${book.imageCount} photos',
                           style: TextStyle(
-                            fontSize: 16.sp,
-                            fontWeight: FontWeight.w800,
-                            color: AppColors.primary,
+                            color: Colors.white,
+                            fontSize: 12.sp,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
                       ),
-                      const Spacer(),
-                      Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(16.r),
-                        ),
-                        child: IconButton(
-                          onPressed: () => _openDetail(context),
-                          tooltip: 'Chat',
-                          icon: Icon(
-                            Icons.chat_bubble_outline_rounded,
-                            color: AppColors.primary,
-                            size: 20.sp,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
                 ],
               ),
+            ),
+            SizedBox(height: 14.w),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Text(
+                        book.title,
+                        style: TextStyle(
+                          fontSize: 17.sp,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.dark,
+                        ),
+                      ),
+                    ),
+                    SizedBox(width: 10.w),
+                    _MetaBadge(
+                      icon: Icons.location_on_rounded,
+                      label: locationBadgeLabel,
+                    ),
+                  ],
+                ),
+                SizedBox(height: 8.h),
+                Wrap(
+                  spacing: 8.w,
+                  runSpacing: 8.h,
+                  children: [
+                    _MetaBadge(
+                      icon: Icons.category_rounded,
+                      label: book.primaryCategory,
+                    ),
+                    if (book.additionalCategoryCount > 0)
+                      _MetaBadge(
+                        icon: Icons.layers_rounded,
+                        label: '+${book.additionalCategoryCount} more',
+                      ),
+                    _MetaBadge(icon: Icons.person_rounded, label: book.author),
+                  ],
+                ),
+                SizedBox(height: 10.h),
+                Text(
+                  book.description.isEmpty ? 'Good Book' : book.description,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13.sp,
+                    height: 1.45,
+                    color: AppColors.dark,
+                  ),
+                ),
+                SizedBox(height: 10.h),
+                // Row(
+                //   crossAxisAlignment: CrossAxisAlignment.start,
+                //   children: [
+                //     Padding(
+                //       padding: EdgeInsets.only(top: 2.h),
+                //       child: Icon(
+                //         Icons.location_on_outlined,
+                //         size: 16.sp,
+                //         color: AppColors.primary,
+                //       ),
+                //     ),
+                //     SizedBox(width: 6.w),
+                //     Expanded(
+                //       child: Text(
+                //         sellerLocationLabel,
+                //         maxLines: 2,
+                //         overflow: TextOverflow.ellipsis,
+                //         style: TextStyle(
+                //           fontSize: 12.sp,
+                //           height: 1.4,
+                //           color: AppColors.muted,
+                //           fontWeight: FontWeight.w600,
+                //         ),
+                //       ),
+                //     ),
+                //   ],
+                // ),
+                // SizedBox(height: 14.h),
+                Row(
+                  children: [
+                    Container(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 12.w,
+                        vertical: 10.h,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(16.r),
+                      ),
+                      child: Text(
+                        '₹${book.price}',
+                        style: TextStyle(
+                          fontSize: 16.sp,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(16.r),
+                      ),
+                      child: IconButton(
+                        onPressed: () => _openChat(context),
+                        tooltip: 'Chat',
+                        icon: Icon(
+                          Icons.chat_bubble_outline_rounded,
+                          color: AppColors.primary,
+                          size: 20.sp,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ],
         ),

@@ -1,5 +1,6 @@
 import 'package:bookcart/data/models/user_model.dart';
 import 'package:bookcart/data/repository/auth_repository.dart';
+import 'package:bookcart/data/repository/location_label_repository.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
@@ -16,6 +17,9 @@ class FirebaseAuthRepository implements AuthRepository {
   CollectionReference<Map<String, dynamic>> get _usersCollection =>
       _firestore.collection('users');
 
+  CollectionReference<Map<String, dynamic>> get _booksCollection =>
+      _firestore.collection('books');
+
   @override
   Future<UserModel?> getCurrentUser() async {
     final currentUser = _firebaseAuth.currentUser;
@@ -27,9 +31,45 @@ class FirebaseAuthRepository implements AuthRepository {
   }
 
   @override
+  Stream<UserModel?> watchCurrentUser() {
+    return _firebaseAuth.authStateChanges().asyncExpand((firebaseUser) {
+      if (firebaseUser == null) {
+        return Stream<UserModel?>.value(null);
+      }
+
+      return _usersCollection.doc(firebaseUser.uid).snapshots().asyncMap((
+        snapshot,
+      ) async {
+        final data = snapshot.data();
+        if (data == null) {
+          return UserModel(
+            id: firebaseUser.uid,
+            name: (firebaseUser.displayName ?? '').trim().isEmpty
+                ? 'Book Cart User'
+                : firebaseUser.displayName!.trim(),
+            phone: firebaseUser.phoneNumber ?? '',
+            email: firebaseUser.email?.trim() ?? '',
+          );
+        }
+
+        final user = UserModel.fromJson(
+          data,
+          fallbackId: firebaseUser.uid,
+          fallbackEmail: firebaseUser.email?.trim(),
+        );
+        return LocationLabelRepository.enrichUser(user);
+      });
+    });
+  }
+
+  @override
   Future<UserModel> login({
     required String email,
     required String password,
+    String? location,
+    double? latitude,
+    double? longitude,
+    DateTime? locationUpdatedAt,
   }) async {
     try {
       final credential = await _firebaseAuth.signInWithEmailAndPassword(
@@ -42,7 +82,31 @@ class FirebaseAuthRepository implements AuthRepository {
         throw const AuthRepositoryException('Login failed. Please try again.');
       }
 
-      return _readUserProfile(firebaseUser);
+      var user = await _readUserProfile(firebaseUser);
+      final shouldUpdateLocation =
+          (location != null && location.trim().isNotEmpty) ||
+          latitude != null ||
+          longitude != null ||
+          locationUpdatedAt != null;
+      if (!shouldUpdateLocation) {
+        return user;
+      }
+
+      user = user.copyWith(
+        location: location?.trim().isNotEmpty == true
+            ? location!.trim()
+            : user.location,
+        latitude: latitude,
+        longitude: longitude,
+        locationUpdatedAt: locationUpdatedAt,
+      );
+
+      await _usersCollection
+          .doc(firebaseUser.uid)
+          .set(user.toJson(), SetOptions(merge: true));
+      await _syncSellerBooks(user);
+
+      return user;
     } on FirebaseAuthException catch (error) {
       throw AuthRepositoryException(_mapAuthError(error));
     } on FirebaseException catch (error) {
@@ -56,7 +120,10 @@ class FirebaseAuthRepository implements AuthRepository {
     required String phone,
     required String email,
     required String password,
-    String location = 'Kolkata, West Bengal',
+    String location = UserModel.defaultLocation,
+    double? latitude,
+    double? longitude,
+    DateTime? locationUpdatedAt,
     String? profileImageBase64,
   }) async {
     try {
@@ -77,7 +144,12 @@ class FirebaseAuthRepository implements AuthRepository {
         name: _normalizedName(name),
         phone: phone.trim(),
         email: email.trim(),
-        location: location.trim().isEmpty ? 'Kolkata, West Bengal' : location,
+        location: location.trim().isEmpty
+            ? UserModel.defaultLocation
+            : location,
+        latitude: latitude,
+        longitude: longitude,
+        locationUpdatedAt: locationUpdatedAt,
         profileImageBase64: profileImageBase64,
       );
 
@@ -118,13 +190,17 @@ class FirebaseAuthRepository implements AuthRepository {
         email: nextEmail,
         phone: user.phone.trim(),
         location: user.location.trim().isEmpty
-            ? 'Kolkata, West Bengal'
+            ? UserModel.defaultLocation
             : user.location.trim(),
+        latitude: user.latitude,
+        longitude: user.longitude,
+        locationUpdatedAt: user.locationUpdatedAt,
       );
 
       await _usersCollection
           .doc(currentUser.uid)
           .set(updatedUser.toJson(), SetOptions(merge: true));
+      await _syncSellerBooks(updatedUser);
 
       return updatedUser;
     } on FirebaseAuthException catch (error) {
@@ -203,11 +279,36 @@ class FirebaseAuthRepository implements AuthRepository {
       );
     }
 
-    return UserModel.fromJson(
+    final user = UserModel.fromJson(
       data,
       fallbackId: firebaseUser.uid,
       fallbackEmail: firebaseUser.email?.trim(),
     );
+    return LocationLabelRepository.enrichUser(user);
+  }
+
+  Future<void> _syncSellerBooks(UserModel user) async {
+    final snapshot = await _booksCollection
+        .where('sellerId', isEqualTo: user.id)
+        .get();
+    if (snapshot.docs.isEmpty) {
+      return;
+    }
+
+    final batch = _firestore.batch();
+    for (final document in snapshot.docs) {
+      batch.set(document.reference, {
+        'sellerName': user.name,
+        'sellerEmail': user.email,
+        'sellerPhone': user.phone,
+        'sellerLocation': user.location,
+        'sellerLatitude': user.latitude,
+        'sellerLongitude': user.longitude,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+
+    await batch.commit();
   }
 
   String _normalizedName(String value) {

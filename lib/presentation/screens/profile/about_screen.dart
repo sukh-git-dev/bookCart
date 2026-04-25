@@ -1,4 +1,5 @@
 import 'package:bookcart/core/constants/app_colors.dart';
+import 'package:bookcart/core/utils/app_animation_utils.dart';
 import 'package:bookcart/presentation/screens/profile/widgets/policy_card.dart';
 import 'package:bookcart/presentation/screens/profile/widgets/policy_header.dart';
 import 'package:flutter/material.dart';
@@ -31,7 +32,7 @@ class AboutScreen extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Column(
+              child: AppStaggeredColumn(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Center(
@@ -63,7 +64,7 @@ class AboutScreen extends StatelessWidget {
                   const PolicyCard(
                     title: 'Core Features',
                     body:
-                        'The app includes Firebase login and sign up, home search and category filter, sell form, my books management, chat UI, and account editing.',
+                        'The app includes Supabase email auth, home search and category filter, sell form, my books management, chat UI, and account editing.',
                   ),
                   SizedBox(height: 12.h),
                   const PolicyCard(
@@ -73,7 +74,7 @@ class AboutScreen extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
+            ).animatePage(),
           ),
         ),
       ),

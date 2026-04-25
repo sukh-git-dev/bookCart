@@ -1,5 +1,7 @@
 import 'package:bookcart/core/constants/app_colors.dart';
+import 'package:bookcart/core/utils/app_animation_utils.dart';
 import 'package:bookcart/data/models/book_model.dart';
+import 'package:bookcart/logic/cubits/auth_cubit.dart';
 import 'package:bookcart/logic/cubits/book_cubit.dart';
 import 'package:bookcart/logic/cubits/book_state.dart';
 import 'package:bookcart/presentation/screens/home/book_detail_screen.dart';
@@ -56,7 +58,11 @@ class _CartScreenState extends State<CartScreen> {
         context.read<BookCubit>().clearMessage();
       },
       builder: (context, state) {
-        final filteredBooks = state.books.where((book) {
+        final userId = context.watch<AuthCubit>().state.user?.id ?? '';
+        final myBooks = state.books.where((book) {
+          return book.sellerId.isEmpty || book.sellerId == userId;
+        }).toList();
+        final filteredBooks = myBooks.where((book) {
           final query = searchQuery.trim().toLowerCase();
           return query.isEmpty ||
               book.title.toLowerCase().contains(query) ||
@@ -73,10 +79,10 @@ class _CartScreenState extends State<CartScreen> {
               child: Center(
                 child: ConstrainedBox(
                   constraints: BoxConstraints(maxWidth: isWide ? 1260 : 760),
-                  child: Column(
+                  child: AppStaggeredColumn(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _MyBooksHero(bookCount: state.books.length),
+                      _MyBooksHero(bookCount: myBooks.length),
                       SizedBox(height: 22.h),
                       TextField(
                         controller: _searchController,
@@ -168,7 +174,7 @@ class _CartScreenState extends State<CartScreen> {
                           itemBuilder: (_, index) => Padding(
                             padding: EdgeInsets.only(bottom: 14.h),
                             child: _MyBookCard(book: filteredBooks[index]),
-                          ),
+                          ).animateListItem(order: index),
                         ),
                     ],
                   ),
